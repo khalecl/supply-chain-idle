@@ -1,351 +1,202 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { CROPS, PROCESSORS, RESOURCES, ALL_RESOURCE_IDS } from '../data/crops';
 
-// ═══════════════════════════════════════════
-//  BUILDING CONSTANTS
-// ═══════════════════════════════════════════
-
-const BUILDING_COSTS = {
-  FARM: 50, WAREHOUSE: 100, FACTORY: 200,
-  GRAIN_FARM: 60, MILL: 120, BAKERY: 250,
-};
-const PRODUCTION_TIMES = {
-  FARM: 5000, WAREHOUSE: 8000, FACTORY: 10000,
-  GRAIN_FARM: 6000, MILL: 7000, BAKERY: 12000,
-};
-const OPERATION_COSTS = {
-  FARM: 1, WAREHOUSE: 2, FACTORY: 5,
-  GRAIN_FARM: 1, MILL: 3, BAKERY: 6,
+// Build initial resource state: all resources start at 0
+const initResources = () => {
+  const r = {};
+  ALL_RESOURCE_IDS.forEach(id => r[id] = 0);
+  return r;
 };
 
-const BASE_PRICES = {
-  cotton: 2.50, cloth: 5.00, textiles: 12.00,
-  wheat: 2.00, flour: 4.50, bread: 15.00,
-};
-const PRICE_RANGES = {
-  cotton: { min: 1.00, max: 4.00 },
-  cloth: { min: 2.00, max: 8.00 },
-  textiles: { min: 5.00, max: 19.00 },
-  wheat: { min: 0.80, max: 3.50 },
-  flour: { min: 2.00, max: 7.00 },
-  bread: { min: 8.00, max: 22.00 },
+// Build initial market prices from RESOURCES data
+const initPrices = () => {
+  const p = {};
+  ALL_RESOURCE_IDS.forEach(id => p[id] = RESOURCES[id].basePrice);
+  return p;
 };
 
 export const useGameStore = create(
   persist(
     (set, get) => ({
-      // ─── RESOURCES ───
-      cotton: 0, cloth: 0, textiles: 0,
-      wheat: 0, flour: 0, bread: 0,
+      resources: initResources(),
       money: 100,
 
-      // ─── TEXTILE CHAIN BUILDINGS ───
-      farms: [],
-      warehouses: [],
-      factories: [],
-
-      // ─── FOOD CHAIN BUILDINGS ───
-      grainFarms: [],
-      mills: [],
-      bakeries: [],
-
+      // Unified buildings
+      farms: [],           // each has cropType
+      processors: [],      // each has processorType
       buildingIdCounter: 0,
-      marketPrices: { ...BASE_PRICES },
+
+      marketPrices: initPrices(),
       lastPriceUpdate: 0,
       prestigeLevel: 0,
       gameTime: 0,
       lastHarvestEvent: null,
 
-      getPrestigeMultiplier: () => 1 + get().prestigeLevel * 0.05,
-      getAdjustedProductionTime: (baseTime) => baseTime / get().getPrestigeMultiplier(),
-      getBuildingCost: (type) => BUILDING_COSTS[type] || 0,
+      // Farm awaiting crop selection
+      pendingFarmId: null,
 
-      // ═══════════════════════════════════════
-      //  TEXTILE CHAIN: Farm → Warehouse → Factory
-      // ═══════════════════════════════════════
+      getPrestigeMultiplier: () => 1 + get().prestigeLevel * 0.05,
+
+      // ═══ FARM ═══
 
       buyFarm: (position) => {
         const s = get();
-        if (s.money < BUILDING_COSTS.FARM) return false;
+        if (s.money < 50) return null;
         const id = s.buildingIdCounter;
         set(s => ({
-          money: s.money - BUILDING_COSTS.FARM,
-          farms: [...s.farms, { id, position, productionTime: PRODUCTION_TIMES.FARM, currentProduction: 0, isReady: false }],
-          buildingIdCounter: s.buildingIdCounter + 1
+          money: s.money - 50,
+          farms: [...s.farms, { id, position, cropType: null, currentProduction: 0, isReady: false }],
+          buildingIdCounter: s.buildingIdCounter + 1,
+          pendingFarmId: id,
+        }));
+        return id;
+      },
+
+      selectCrop: (farmId, cropType) => {
+        if (!CROPS[cropType]) return false;
+        set(s => ({
+          farms: s.farms.map(f => f.id === farmId ? { ...f, cropType, currentProduction: 0, isReady: false } : f),
+          pendingFarmId: null,
         }));
         return true;
       },
 
-      buyWarehouse: (position) => {
+      switchCrop: (farmId, newCropType) => {
         const s = get();
-        if (s.money < BUILDING_COSTS.WAREHOUSE) return false;
-        const id = s.buildingIdCounter;
+        if (s.money < 25 || !CROPS[newCropType]) return false;
         set(s => ({
-          money: s.money - BUILDING_COSTS.WAREHOUSE,
-          warehouses: [...s.warehouses, { id, position, productionTime: PRODUCTION_TIMES.WAREHOUSE, currentProduction: 0, storageAmount: 0, isReady: false }],
-          buildingIdCounter: s.buildingIdCounter + 1
+          money: s.money - 25,
+          farms: s.farms.map(f => f.id === farmId ? { ...f, cropType: newCropType, currentProduction: 0, isReady: false } : f),
         }));
         return true;
       },
 
-      buyFactory: (position) => {
+      cancelFarmPlacement: () => {
         const s = get();
-        if (s.money < BUILDING_COSTS.FACTORY) return false;
-        const id = s.buildingIdCounter;
+        if (s.pendingFarmId === null) return;
         set(s => ({
-          money: s.money - BUILDING_COSTS.FACTORY,
-          factories: [...s.factories, { id, position, productionTime: PRODUCTION_TIMES.FACTORY, currentProduction: 0, clothInput: 0, isReady: false }],
-          buildingIdCounter: s.buildingIdCounter + 1
+          money: s.money + 50,
+          farms: s.farms.filter(f => f.id !== s.pendingFarmId),
+          pendingFarmId: null,
         }));
-        return true;
       },
 
       harvestFarm: (farmId) => {
         const s = get();
         const farm = s.farms.find(f => f.id === farmId);
-        if (!farm || !farm.isReady || s.money < OPERATION_COSTS.FARM) return false;
+        if (!farm || !farm.isReady || !farm.cropType) return false;
+        const crop = CROPS[farm.cropType];
+        if (!crop || s.money < crop.harvestCost) return false;
         set(s => ({
-          money: s.money - OPERATION_COSTS.FARM,
-          cotton: s.cotton + 1,
+          money: s.money - crop.harvestCost,
+          resources: { ...s.resources, [farm.cropType]: (s.resources[farm.cropType] || 0) + 1 },
           farms: s.farms.map(f => f.id === farmId ? { ...f, isReady: false, currentProduction: 0 } : f),
-          lastHarvestEvent: { type: 'FARM', buildingId: farmId, timestamp: Date.now() }
+          lastHarvestEvent: { type: 'FARM', cropType: farm.cropType, buildingId: farmId, timestamp: Date.now() },
         }));
         return true;
       },
 
-      sendCottonToWarehouse: (warehouseId, amount) => {
-        const s = get();
-        const wh = s.warehouses.find(w => w.id === warehouseId);
-        if (!wh || s.cotton < amount || s.money < OPERATION_COSTS.WAREHOUSE) return false;
-        set(s => ({
-          money: s.money - OPERATION_COSTS.WAREHOUSE,
-          cotton: s.cotton - amount,
-          warehouses: s.warehouses.map(w => w.id === warehouseId ? { ...w, storageAmount: w.storageAmount + amount, currentProduction: 0 } : w)
-        }));
-        return true;
-      },
+      // ═══ PROCESSORS (unified) ═══
 
-      harvestWarehouse: (warehouseId) => {
+      buyProcessor: (processorType, position) => {
+        const def = PROCESSORS[processorType];
+        if (!def) return null;
         const s = get();
-        const wh = s.warehouses.find(w => w.id === warehouseId);
-        if (!wh || wh.storageAmount === 0 || !wh.isReady) return false;
-        const produced = wh.storageAmount * 0.8;
-        set(s => ({
-          cloth: s.cloth + produced,
-          warehouses: s.warehouses.map(w => w.id === warehouseId ? { ...w, isReady: false, currentProduction: 0, storageAmount: 0 } : w)
-        }));
-        return true;
-      },
-
-      sendClothToFactory: (factoryId, amount) => {
-        const s = get();
-        const fac = s.factories.find(f => f.id === factoryId);
-        if (!fac || s.cloth < amount || s.money < OPERATION_COSTS.FACTORY) return false;
-        set(s => ({
-          money: s.money - OPERATION_COSTS.FACTORY,
-          cloth: s.cloth - amount,
-          factories: s.factories.map(f => f.id === factoryId ? { ...f, clothInput: f.clothInput + amount, currentProduction: 0 } : f)
-        }));
-        return true;
-      },
-
-      harvestFactory: (factoryId) => {
-        const s = get();
-        const fac = s.factories.find(f => f.id === factoryId);
-        if (!fac || !fac.isReady || fac.clothInput < 2 || s.money < OPERATION_COSTS.FACTORY) return false;
-        set(s => ({
-          money: s.money - OPERATION_COSTS.FACTORY,
-          textiles: s.textiles + 1,
-          factories: s.factories.map(f => f.id === factoryId ? { ...f, isReady: false, currentProduction: 0, clothInput: f.clothInput - 2 } : f)
-        }));
-        return true;
-      },
-
-      // ═══════════════════════════════════════
-      //  FOOD CHAIN: Grain Farm → Mill → Bakery
-      // ═══════════════════════════════════════
-
-      buyGrainFarm: (position) => {
-        const s = get();
-        if (s.money < BUILDING_COSTS.GRAIN_FARM) return false;
+        if (s.money < def.cost) return null;
         const id = s.buildingIdCounter;
         set(s => ({
-          money: s.money - BUILDING_COSTS.GRAIN_FARM,
-          grainFarms: [...s.grainFarms, { id, position, productionTime: PRODUCTION_TIMES.GRAIN_FARM, currentProduction: 0, isReady: false }],
-          buildingIdCounter: s.buildingIdCounter + 1
+          money: s.money - def.cost,
+          processors: [...s.processors, { id, position, processorType, storageAmount: 0, currentProduction: 0, isReady: false }],
+          buildingIdCounter: s.buildingIdCounter + 1,
         }));
-        return true;
+        return id;
       },
 
-      buyMill: (position) => {
+      loadProcessor: (processorId, amount) => {
         const s = get();
-        if (s.money < BUILDING_COSTS.MILL) return false;
-        const id = s.buildingIdCounter;
+        const proc = s.processors.find(p => p.id === processorId);
+        if (!proc) return false;
+        const def = PROCESSORS[proc.processorType];
+        if (!def) return false;
+        const available = s.resources[def.input] || 0;
+        if (available < amount || s.money < def.opCost) return false;
         set(s => ({
-          money: s.money - BUILDING_COSTS.MILL,
-          mills: [...s.mills, { id, position, productionTime: PRODUCTION_TIMES.MILL, currentProduction: 0, storageAmount: 0, isReady: false }],
-          buildingIdCounter: s.buildingIdCounter + 1
+          money: s.money - def.opCost,
+          resources: { ...s.resources, [def.input]: s.resources[def.input] - amount },
+          processors: s.processors.map(p => p.id === processorId
+            ? { ...p, storageAmount: p.storageAmount + amount, currentProduction: 0 } : p),
         }));
         return true;
       },
 
-      buyBakery: (position) => {
+      harvestProcessor: (processorId) => {
         const s = get();
-        if (s.money < BUILDING_COSTS.BAKERY) return false;
-        const id = s.buildingIdCounter;
+        const proc = s.processors.find(p => p.id === processorId);
+        if (!proc || !proc.isReady) return false;
+        const def = PROCESSORS[proc.processorType];
+        if (!def || proc.storageAmount < def.inputAmount || s.money < def.opCost) return false;
         set(s => ({
-          money: s.money - BUILDING_COSTS.BAKERY,
-          bakeries: [...s.bakeries, { id, position, productionTime: PRODUCTION_TIMES.BAKERY, currentProduction: 0, flourInput: 0, isReady: false }],
-          buildingIdCounter: s.buildingIdCounter + 1
+          money: s.money - def.opCost,
+          resources: { ...s.resources, [def.output]: (s.resources[def.output] || 0) + def.outputAmount },
+          processors: s.processors.map(p => p.id === processorId
+            ? { ...p, isReady: false, currentProduction: 0, storageAmount: p.storageAmount - def.inputAmount } : p),
         }));
         return true;
       },
 
-      harvestGrainFarm: (id) => {
+      // ═══ SELL (any resource) ═══
+
+      sellResource: (resourceId, amount) => {
         const s = get();
-        const gf = s.grainFarms.find(f => f.id === id);
-        if (!gf || !gf.isReady || s.money < OPERATION_COSTS.GRAIN_FARM) return false;
+        const available = s.resources[resourceId] || 0;
+        if (available < amount) return 0;
+        const revenue = amount * (s.marketPrices[resourceId] || 0);
         set(s => ({
-          money: s.money - OPERATION_COSTS.GRAIN_FARM,
-          wheat: s.wheat + 1,
-          grainFarms: s.grainFarms.map(f => f.id === id ? { ...f, isReady: false, currentProduction: 0 } : f),
-          lastHarvestEvent: { type: 'GRAIN_FARM', buildingId: id, timestamp: Date.now() }
+          resources: { ...s.resources, [resourceId]: s.resources[resourceId] - amount },
+          money: s.money + revenue,
         }));
-        return true;
+        return revenue;
       },
 
-      sendWheatToMill: (millId, amount) => {
-        const s = get();
-        const mill = s.mills.find(m => m.id === millId);
-        if (!mill || s.wheat < amount || s.money < OPERATION_COSTS.MILL) return false;
-        set(s => ({
-          money: s.money - OPERATION_COSTS.MILL,
-          wheat: s.wheat - amount,
-          mills: s.mills.map(m => m.id === millId ? { ...m, storageAmount: m.storageAmount + amount, currentProduction: 0 } : m)
-        }));
-        return true;
-      },
-
-      harvestMill: (millId) => {
-        const s = get();
-        const mill = s.mills.find(m => m.id === millId);
-        if (!mill || mill.storageAmount === 0 || !mill.isReady) return false;
-        const produced = mill.storageAmount * 0.75; // 25% milling loss
-        set(s => ({
-          flour: s.flour + produced,
-          mills: s.mills.map(m => m.id === millId ? { ...m, isReady: false, currentProduction: 0, storageAmount: 0 } : m)
-        }));
-        return true;
-      },
-
-      sendFlourToBakery: (bakeryId, amount) => {
-        const s = get();
-        const bak = s.bakeries.find(b => b.id === bakeryId);
-        if (!bak || s.flour < amount || s.money < OPERATION_COSTS.BAKERY) return false;
-        set(s => ({
-          money: s.money - OPERATION_COSTS.BAKERY,
-          flour: s.flour - amount,
-          bakeries: s.bakeries.map(b => b.id === bakeryId ? { ...b, flourInput: b.flourInput + amount, currentProduction: 0 } : b)
-        }));
-        return true;
-      },
-
-      harvestBakery: (bakeryId) => {
-        const s = get();
-        const bak = s.bakeries.find(b => b.id === bakeryId);
-        if (!bak || !bak.isReady || bak.flourInput < 3 || s.money < OPERATION_COSTS.BAKERY) return false;
-        set(s => ({
-          money: s.money - OPERATION_COSTS.BAKERY,
-          bread: s.bread + 1,
-          bakeries: s.bakeries.map(b => b.id === bakeryId ? { ...b, isReady: false, currentProduction: 0, flourInput: b.flourInput - 3 } : b)
-        }));
-        return true;
-      },
-
-      // ═══════════════════════════════════════
-      //  SELL (both chains)
-      // ═══════════════════════════════════════
-
-      sellCotton: (amount) => {
-        const s = get(); if (s.cotton < amount) return 0;
-        const rev = amount * s.marketPrices.cotton;
-        set(s => ({ cotton: s.cotton - amount, money: s.money + rev }));
-        return rev;
-      },
-      sellCloth: (amount) => {
-        const s = get(); if (s.cloth < amount) return 0;
-        const rev = amount * s.marketPrices.cloth;
-        set(s => ({ cloth: s.cloth - amount, money: s.money + rev }));
-        return rev;
-      },
-      sellTextiles: (amount) => {
-        const s = get(); if (s.textiles < amount) return 0;
-        const rev = amount * s.marketPrices.textiles;
-        set(s => ({ textiles: s.textiles - amount, money: s.money + rev }));
-        return rev;
-      },
-      sellWheat: (amount) => {
-        const s = get(); if (s.wheat < amount) return 0;
-        const rev = amount * s.marketPrices.wheat;
-        set(s => ({ wheat: s.wheat - amount, money: s.money + rev }));
-        return rev;
-      },
-      sellFlour: (amount) => {
-        const s = get(); if (s.flour < amount) return 0;
-        const rev = amount * s.marketPrices.flour;
-        set(s => ({ flour: s.flour - amount, money: s.money + rev }));
-        return rev;
-      },
-      sellBread: (amount) => {
-        const s = get(); if (s.bread < amount) return 0;
-        const rev = amount * s.marketPrices.bread;
-        set(s => ({ bread: s.bread - amount, money: s.money + rev }));
-        return rev;
-      },
-
-      // ═══════════════════════════════════════
-      //  MARKET PRICES
-      // ═══════════════════════════════════════
+      // ═══ MARKET ═══
 
       updateMarketPrices: () => {
         const s = get();
         if (s.gameTime - s.lastPriceUpdate < 10) return;
         set(s => {
           const newPrices = {};
-          Object.keys(BASE_PRICES).forEach(product => {
-            const base = BASE_PRICES[product];
-            const range = PRICE_RANGES[product];
+          ALL_RESOURCE_IDS.forEach(id => {
+            const res = RESOURCES[id];
             const variance = (Math.random() - 0.5) * 0.4;
-            newPrices[product] = Math.round(Math.max(range.min, Math.min(range.max, base + variance)) * 100) / 100;
+            newPrices[id] = Math.round(Math.max(res.min, Math.min(res.max, res.basePrice + variance)) * 100) / 100;
           });
           return { marketPrices: newPrices, lastPriceUpdate: s.gameTime };
         });
       },
 
-      // ═══════════════════════════════════════
-      //  PRODUCTION + TICK
-      // ═══════════════════════════════════════
+      // ═══ PRODUCTION TICK ═══
 
       updateProduction: (deltaTime) => {
         const mult = get().getPrestigeMultiplier();
-        set(s => {
-          const updateTimers = (arr, baseTime, readyCondition = () => true) =>
-            arr.map(b => {
-              if (b.isReady || !readyCondition(b)) return b;
-              const newProd = b.currentProduction + deltaTime * 1000;
-              if (newProd >= baseTime / mult) return { ...b, isReady: true, currentProduction: 0 };
-              return { ...b, currentProduction: newProd };
-            });
-
-          return {
-            farms: updateTimers(s.farms, PRODUCTION_TIMES.FARM),
-            warehouses: updateTimers(s.warehouses, PRODUCTION_TIMES.WAREHOUSE, w => w.storageAmount > 0),
-            factories: updateTimers(s.factories, PRODUCTION_TIMES.FACTORY, f => f.clothInput >= 2),
-            grainFarms: updateTimers(s.grainFarms, PRODUCTION_TIMES.GRAIN_FARM),
-            mills: updateTimers(s.mills, PRODUCTION_TIMES.MILL, m => m.storageAmount > 0),
-            bakeries: updateTimers(s.bakeries, PRODUCTION_TIMES.BAKERY, b => b.flourInput >= 3),
-          };
-        });
+        set(s => ({
+          farms: s.farms.map(farm => {
+            if (farm.isReady || !farm.cropType) return farm;
+            const crop = CROPS[farm.cropType];
+            if (!crop) return farm;
+            const newProd = farm.currentProduction + deltaTime * 1000;
+            if (newProd >= crop.growTime / mult) return { ...farm, isReady: true, currentProduction: 0 };
+            return { ...farm, currentProduction: newProd };
+          }),
+          processors: s.processors.map(proc => {
+            if (proc.isReady) return proc;
+            const def = PROCESSORS[proc.processorType];
+            if (!def || proc.storageAmount < def.inputAmount) return proc;
+            const newProd = proc.currentProduction + deltaTime * 1000;
+            if (newProd >= def.processTime / mult) return { ...proc, isReady: true, currentProduction: 0 };
+            return { ...proc, currentProduction: newProd };
+          }),
+        }));
       },
 
       tick: (deltaTime) => {
@@ -354,33 +205,29 @@ export const useGameStore = create(
         get().updateMarketPrices();
       },
 
-      // ═══════════════════════════════════════
-      //  PRESTIGE + RESET
-      // ═══════════════════════════════════════
+      // ═══ PRESTIGE + RESET ═══
 
       prestige: () => {
-        set(s => ({
-          cotton: 0, cloth: 0, textiles: 0,
-          wheat: 0, flour: 0, bread: 0,
-          money: 100,
-          prestigeLevel: s.prestigeLevel + 1,
-          gameTime: 0
-        }));
+        set(s => ({ resources: initResources(), money: 100, prestigeLevel: s.prestigeLevel + 1, gameTime: 0 }));
       },
 
       reset: () => {
         set({
-          cotton: 0, cloth: 0, textiles: 0,
-          wheat: 0, flour: 0, bread: 0,
-          money: 100,
-          farms: [], warehouses: [], factories: [],
-          grainFarms: [], mills: [], bakeries: [],
-          buildingIdCounter: 0,
-          marketPrices: { ...BASE_PRICES },
-          lastPriceUpdate: 0, prestigeLevel: 0, gameTime: 0
+          resources: initResources(), money: 100, farms: [], processors: [],
+          buildingIdCounter: 0, marketPrices: initPrices(),
+          lastPriceUpdate: 0, prestigeLevel: 0, gameTime: 0, pendingFarmId: null,
         });
-      }
+      },
+
+      // ═══ HELPERS ═══
+      getResource: (id) => get().resources[id] || 0,
+      getPrice: (id) => get().marketPrices[id] || 0,
+      getBuildingCost: (type) => {
+        if (type === 'FARM') return 50;
+        const def = PROCESSORS[type];
+        return def ? def.cost : 0;
+      },
     }),
-    { name: 'supply-chain-game-store', version: 2 }
+    { name: 'supply-chain-game-store', version: 3 }
   )
 );
