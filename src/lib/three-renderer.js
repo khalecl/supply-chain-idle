@@ -6,15 +6,11 @@ export class GameRenderer {
   constructor(canvas, gameStore, options = {}) {
     this.canvas = canvas;
     this.gameStore = gameStore;
-    this.options = options; // { skipWorldGen: bool }
-
-    // ─── THREE CORE ───
+    this.options = options;
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x9bc4e0, 0.0008);
-
     this.camera = new THREE.PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 5000);
     this.camera.position.set(0, 60, 100);
-
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(canvas.width, canvas.height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -22,8 +18,6 @@ export class GameRenderer {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
-
-    // ─── ORBIT CONTROLS ───
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
@@ -31,650 +25,181 @@ export class GameRenderer {
     this.controls.minDistance = 15;
     this.controls.maxDistance = 400;
     this.controls.target.set(0, 0, 0);
-
-    // ─── PAN VELOCITY (arrow keys + buttons) ───
-    this.panVelocity = new THREE.Vector3();
     this.panKeys = { left: false, right: false, up: false, down: false };
-    this.panSpeed = 80; // world units per second
-
-    // ─── RAYCASTER ───
+    this.panSpeed = 80;
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
     this.placementGround = null;
-
-    // ─── PLACEMENT ───
     this.placementMode = null;
     this.previewBuilding = null;
-
-    // ─── COLLECTIONS ───
     this.models = new Map();
     this.landscapeObjects = [];
     this.buildings = [];
-    this.workers = [];
-
-    // ─── LOADER ───
     this.gltfLoader = new GLTFLoader();
 
-    // ─── TARGET SIZES (world-unit heights after scaling) ───
     this.targetSizes = {
-      // Buildings — keys match BOTH 'FARM' and 'farm' via normalization
-      'farm':               6,
-      'warehouse':          5,
-      'factory':            8,
-
-      // Landscape
-      'tree-oak':           5,
-      'tree-pine':          6,
-      'rock-large':         2.0,
-      'rock-small':         1.0,
-      'grass-tuft':         0.5,
-      'bush':               1.2,
-      'mountain-low':      20,
-      'mountain-high':     35,
-
-      // Characters
-      'worker-base':        1.6,
-      'worker-farmer':      1.6,
-      'worker-processor':   1.6,
-      'worker-factory':     1.6,
-
-      // Items
-      'cotton-bundle':      0.6,
-      'cloth-roll':         0.8,
-      'textile-box':        0.8,
-
-      // Effects
-      'smoke-particle':     0.4,
-      'dust-particle':      0.3,
-      'spark-particle':     0.3,
-
-      // Vehicles
-      'cart':               2.0,
-      'truck':              3.0,
+      'farm':6,'warehouse':5,'factory':8,'grain_farm':6,'mill':7,'bakery':6,
+      'tree-oak':5,'tree-pine':6,'tree-willow':5.5,'tree-palm':7,'tree-dead':4,'tree-stump':1,
+      'bush':1.2,'grass-tuft':0.5,'flower-red':0.6,'flower-yellow':0.7,'flower-blue':0.6,
+      'hedge':1.8,'mushroom':0.5,'crop-row':0.8,'haystack':2,'fallen-log':1,
+      'rock-large':2,'rock-small':1,'rock-flat':0.6,'rock-cluster':1.8,'cliff':8,
+      'mountain-high':35,'mountain-low':20,'hill':8,
+      'fence-wood':1.5,'fence-stone':1.8,'gate':3,'bridge-wood':2,'well':2.5,
+      'windmill':10,'water-tower':8,'market-stall':3,'signpost':2.5,'lamp-post':3.5,'bench':1,
+      'barrel':1,'crate':0.8,'pallet':0.4,'sack':0.7,'wheelbarrow':1.2,
+      'campfire':1,'tent':2.5,'flag':3,'fountain':2.5,
+      'cotton-bundle':0.6,'cloth-roll':0.8,'textile-box':0.8,
+      'wheat-bundle':0.6,'flour-sack':0.7,'bread-basket':0.5,
+      'cart':2,'truck':3,'wagon':2.5,'boat':2,
+      'worker-base':1.6,'worker-farmer':1.6,'worker-processor':1.6,'worker-factory':1.6,'worker-baker':1.6,
+      'pond':1,'river-straight':0.5,'river-bend':0.5,
     };
 
-    // ─── MODEL MANIFEST ───
-    // Use import.meta.env.BASE_URL so paths work on GitHub Pages
     const base = import.meta.env.BASE_URL || '/';
-    this.modelManifest = {
-      // Buildings
-      'farm':              `${base}models/buildings/farm.glb`,
-      'warehouse':         `${base}models/buildings/warehouse.glb`,
-      'factory':           `${base}models/buildings/factory.glb`,
-
-      // Characters
-      'worker-base':       `${base}models/characters/worker-base.glb`,
-      'worker-farmer':     `${base}models/characters/worker-farmer.glb`,
-      'worker-processor':  `${base}models/characters/worker-processor.glb`,
-      'worker-factory':    `${base}models/characters/worker-factory.glb`,
-
-      // Landscape
-      'tree-oak':          `${base}models/landscape/tree-oak.glb`,
-      'tree-pine':         `${base}models/landscape/tree-pine.glb`,
-      'rock-large':        `${base}models/landscape/rock-large.glb`,
-      'rock-small':        `${base}models/landscape/rock-small.glb`,
-      'grass-tuft':        `${base}models/landscape/grass-tuft.glb`,
-      'bush':              `${base}models/landscape/bush.glb`,
-      'mountain-low':      `${base}models/landscape/mountain-low.glb`,
-      'mountain-high':     `${base}models/landscape/mountain-high.glb`,
-
-      // Items
-      'cotton-bundle':     `${base}models/items/cotton-bundle.glb`,
-      'cloth-roll':        `${base}models/items/cloth-roll.glb`,
-      'textile-box':       `${base}models/items/textile-box.glb`,
-
-      // Effects
-      'smoke-particle':    `${base}models/effects/smoke-particle.glb`,
-      'dust-particle':     `${base}models/effects/dust-particle.glb`,
-      'spark-particle':    `${base}models/effects/spark-particle.glb`,
-
-      // Vehicles
-      'cart':              `${base}models/vehicles/cart.glb`,
-      'truck':             `${base}models/vehicles/truck.glb`,
+    this.modelManifest = {};
+    const folders = {
+      buildings:['farm','warehouse','factory','grain_farm','mill','bakery'],
+      characters:['worker-base','worker-farmer','worker-processor','worker-factory','worker-baker'],
+      landscape:['tree-oak','tree-pine','tree-willow','tree-palm','tree-dead','tree-stump','bush','grass-tuft','flower-red','flower-yellow','flower-blue','hedge','mushroom','crop-row','haystack','fallen-log','rock-large','rock-small','rock-flat','rock-cluster','cliff','mountain-high','mountain-low','hill','pond','river-straight','river-bend'],
+      structures:['fence-wood','fence-stone','gate','bridge-wood','well','windmill','water-tower','market-stall','signpost','lamp-post','bench'],
+      props:['barrel','crate','pallet','sack','wheelbarrow','campfire','tent','flag','fountain'],
+      items:['cotton-bundle','cloth-roll','textile-box','wheat-bundle','flour-sack','bread-basket'],
+      vehicles:['cart','truck','wagon','boat'],
     };
+    for (const [folder,names] of Object.entries(folders)) for (const name of names) this.modelManifest[name]=`${base}models/${folder}/${name}.glb`;
 
-    // ─── INIT ───
     this.initScene();
     this.setupLighting();
     this.setupMouseTracking();
     this.setupKeyboardPan();
-
     this.modelsReady = false;
     this.initAsync();
   }
 
-  // ══════════════════════════════════════════════════════════
-  //  ASYNC: Load models → generate world
-  // ══════════════════════════════════════════════════════════
-
   async initAsync() {
-    console.log('🔄 Loading GLB models...');
-    await this.loadAllModels();
-    const loaded = [...this.models.keys()];
-    console.log(`✅ ${loaded.length} models loaded: ${loaded.join(', ')}`);
+    await Promise.allSettled(Object.entries(this.modelManifest).map(([n,p])=>this.loadModel(n,p)));
     this.modelsReady = true;
-
-    if (!this.options.skipWorldGen) {
-      this.generateWorld();
-      console.log('✅ World generated');
-    } else {
-      console.log('⏭️ World gen skipped (builder mode)');
-    }
-  }
-
-  async loadAllModels() {
-    const promises = Object.entries(this.modelManifest).map(([name, path]) =>
-      this.loadModel(name, path)
-    );
-    await Promise.allSettled(promises);
+    if (!this.options.skipWorldGen) this.generateWorld();
   }
 
   async loadModel(name, path) {
     try {
       const gltf = await this.gltfLoader.loadAsync(path);
       const model = gltf.scene;
-
-      model.traverse((node) => {
-        if (node.isMesh) {
-          node.castShadow = true;
-          node.receiveShadow = true;
-        }
-      });
-
-      // Measure natural bounding box
+      model.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
       const box = new THREE.Box3().setFromObject(model);
-      const size = new THREE.Vector3();
-      box.getSize(size);
-
-      this.models.set(name, {
-        scene: model,
-        naturalHeight: Math.max(size.y, 0.01),
-        bbox: box.clone(),
-      });
-      console.log(`  ✅ ${name}  (h=${size.y.toFixed(2)}, w=${size.x.toFixed(2)}, d=${size.z.toFixed(2)})`);
-    } catch (err) {
-      // Silently fall back to procedural
-      console.warn(`  ⚠️ ${name}: fallback  (${err.message?.substring(0, 60)})`);
-    }
+      const size = new THREE.Vector3(); box.getSize(size);
+      this.models.set(name, { scene:model, naturalHeight:Math.max(size.y,0.01) });
+    } catch(e) {}
   }
 
-  // ── Get a model clone, auto-scaled to target size, bottom at y=0 ──
   getModel(name) {
-    const key = name.toLowerCase();
-    const target = this.targetSizes[key] || 2;
-    const entry = this.models.get(key);
-
-    if (entry) {
-      const clone = entry.scene.clone();
-      const s = target / entry.naturalHeight;
-      clone.scale.set(s, s, s);
-
-      // Re-measure after scale and anchor bottom to y=0
-      const box = new THREE.Box3().setFromObject(clone);
-      clone.position.y = -box.min.y;
-
-      return clone;
-    }
-    return this.proceduralFallback(key, target);
+    const key=name.toLowerCase(); const target=this.targetSizes[key]||2; const entry=this.models.get(key);
+    if(entry){const c=entry.scene.clone();const s=target/entry.naturalHeight;c.scale.set(s,s,s);const b=new THREE.Box3().setFromObject(c);c.position.y=-b.min.y;return c;}
+    return this.pf(key,target);
   }
 
-  // ── Same but with a multiplier on the target size ──
-  getModelScaled(name, mult) {
-    const key = name.toLowerCase();
-    const target = (this.targetSizes[key] || 2) * mult;
-    const entry = this.models.get(key);
-
-    if (entry) {
-      const clone = entry.scene.clone();
-      const s = target / entry.naturalHeight;
-      clone.scale.set(s, s, s);
-      const box = new THREE.Box3().setFromObject(clone);
-      clone.position.y = -box.min.y;
-      return clone;
-    }
-    return this.proceduralFallback(key, target);
+  getModelScaled(name,mult) {
+    const key=name.toLowerCase();const target=(this.targetSizes[key]||2)*mult;const entry=this.models.get(key);
+    if(entry){const c=entry.scene.clone();const s=target/entry.naturalHeight;c.scale.set(s,s,s);const b=new THREE.Box3().setFromObject(c);c.position.y=-b.min.y;return c;}
+    return this.pf(key,target);
   }
 
-  // ══════════════════════════════════════════════════════════
-  //  PROCEDURAL FALLBACKS
-  // ══════════════════════════════════════════════════════════
+  mk(geo,color){const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color}));m.castShadow=true;m.receiveShadow=true;return m;}
 
-  proceduralFallback(key, h) {
-    const g = new THREE.Group();
-
-    if (key === 'farm') {
-      const barn = this.m(new THREE.BoxGeometry(6, 3, 5), 0x8B4513); barn.position.y = 1.5; g.add(barn);
-      const roof = this.m(new THREE.ConeGeometry(4.5, 2.5, 4), 0xc0392b); roof.position.y = 4.2; roof.rotation.y = Math.PI / 4; g.add(roof);
-      const silo = this.m(new THREE.CylinderGeometry(1, 1, 5, 8), 0x95a5a6); silo.position.set(4.5, 2.5, 0); g.add(silo);
-      const st = this.m(new THREE.ConeGeometry(1.2, 1, 8), 0x7f8c8d); st.position.set(4.5, 5.5, 0); g.add(st);
-      return g;
-    }
-    if (key === 'warehouse') {
-      const b = this.m(new THREE.BoxGeometry(8, 4, 6), 0xe67e22); b.position.y = 2; g.add(b);
-      const r = this.m(new THREE.BoxGeometry(9, 0.3, 7), 0xd35400); r.position.y = 4.15; g.add(r);
-      const d = this.m(new THREE.BoxGeometry(2.5, 3, 0.1), 0x2c3e50); d.position.set(0, 1.5, 3.05); g.add(d);
-      return g;
-    }
-    if (key === 'factory') {
-      const b = this.m(new THREE.BoxGeometry(10, 5, 8), 0x2c3e50); b.position.y = 2.5; g.add(b);
-      const r = this.m(new THREE.BoxGeometry(11, 0.4, 9), 0x34495e); r.position.y = 5.2; g.add(r);
-      const s1 = this.m(new THREE.CylinderGeometry(0.6, 0.8, 6, 8), 0x7f8c8d); s1.position.set(3, 8, 2); g.add(s1);
-      for (let i = 0; i < 3; i++) {
-        const w = this.m(new THREE.BoxGeometry(1.2, 1.2, 0.1), 0x85c1e9); w.position.set(-3 + i * 3, 3, 4.05); g.add(w);
-      }
-      return g;
-    }
-    if (key.startsWith('tree')) {
-      const trunk = this.m(new THREE.CylinderGeometry(0.2, 0.35, h * 0.4, 6), 0x8B4513);
-      trunk.position.y = h * 0.2; g.add(trunk);
-      if (key.includes('pine')) {
-        for (let j = 0; j < 3; j++) {
-          const c = this.m(new THREE.ConeGeometry(h * 0.22 - j * 0.2, h * 0.25, 6), 0x1a5c1a);
-          c.position.y = h * 0.42 + j * h * 0.18; g.add(c);
-        }
-      } else {
-        const top = this.m(new THREE.SphereGeometry(h * 0.3, 8, 6), 0x228B22);
-        top.position.y = h * 0.6; g.add(top);
-      }
-      return g;
-    }
-    if (key.startsWith('rock')) {
-      const r = this.m(new THREE.DodecahedronGeometry(h * 0.5, 0), 0x808080);
-      r.position.y = h * 0.25; g.add(r); return g;
-    }
-    if (key.startsWith('mountain')) {
-      const mt = this.m(new THREE.ConeGeometry(h * 0.5, h, 5), 0x6b7b6b);
-      mt.position.y = h * 0.5; g.add(mt); return g;
-    }
-    if (key === 'bush') {
-      const b = this.m(new THREE.SphereGeometry(h * 0.5, 6, 5), 0x2d7d2d);
-      b.position.y = h * 0.35; g.add(b); return g;
-    }
-    if (key === 'grass-tuft') {
-      const bl = this.m(new THREE.ConeGeometry(0.12, h, 4), 0x4a8f2c);
-      bl.position.y = h * 0.5; g.add(bl); return g;
-    }
-    if (key.startsWith('worker')) {
-      const bd = this.m(new THREE.CylinderGeometry(0.25, 0.3, h * 0.55, 8), 0x3498db);
-      bd.position.y = h * 0.3; g.add(bd);
-      const hd = this.m(new THREE.SphereGeometry(h * 0.14, 8, 6), 0xFFDBAC);
-      hd.position.y = h * 0.72; g.add(hd); return g;
-    }
-    // Generic
-    const cube = this.m(new THREE.BoxGeometry(h * 0.6, h, h * 0.6), 0xaaaaaa);
-    cube.position.y = h * 0.5; g.add(cube);
+  pf(key,h) {
+    const g=new THREE.Group();
+    if(key==='farm'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(6,3,5),0x8B4513),{position:new THREE.Vector3(0,1.5,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(4.5,2.5,4),0xc0392b),{position:new THREE.Vector3(0,4.2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(1,1,5,8),0x95a5a6),{position:new THREE.Vector3(4.5,2.5,0)}));return g;}
+    if(key==='warehouse'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(8,4,6),0xe67e22),{position:new THREE.Vector3(0,2,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(9,0.3,7),0xd35400),{position:new THREE.Vector3(0,4.15,0)}));return g;}
+    if(key==='factory'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(10,5,8),0x2c3e50),{position:new THREE.Vector3(0,2.5,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.6,0.8,6,8),0x7f8c8d),{position:new THREE.Vector3(3,8,2)}));return g;}
+    if(key==='grain_farm'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,3,5),0xdaa520),{position:new THREE.Vector3(0,1.5,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(5,2,4),0xb8860b),{position:new THREE.Vector3(0,3.5,0)}));return g;}
+    if(key==='mill'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(2,3,6,8),0xf5deb3),{position:new THREE.Vector3(0,3,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(3,2,8),0x8B4513),{position:new THREE.Vector3(0,7,0)}));return g;}
+    if(key==='bakery'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,4,6),0xd2691e),{position:new THREE.Vector3(0,2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.5,0.5,3,6),0x696969),{position:new THREE.Vector3(3,5.5,-2)}));return g;}
+    if(key.startsWith('tree')){const t=this.mk(new THREE.CylinderGeometry(0.2,0.35,h*0.4,6),0x8B4513);t.position.y=h*0.2;g.add(t);if(key.includes('pine')){for(let j=0;j<3;j++){const c=this.mk(new THREE.ConeGeometry(h*0.22-j*0.2,h*0.25,6),0x1a5c1a);c.position.y=h*0.42+j*h*0.18;g.add(c);}}else if(key.includes('palm')){for(let i=0;i<5;i++){const l=this.mk(new THREE.ConeGeometry(h*0.15,h*0.3,4),0x228B22);l.position.set(Math.cos(i*1.26)*1.5,h*0.75,Math.sin(i*1.26)*1.5);l.rotation.x=0.8;l.rotation.y=i*1.26;g.add(l);}}else if(key.includes('dead')){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.05,0.1,h*0.3,4),0x5c4033),{position:new THREE.Vector3(0.5,h*0.35,0)}));}else if(key.includes('stump')){const s=this.mk(new THREE.CylinderGeometry(0.6,0.7,h,8),0x8B4513);s.position.y=h*0.5;g.add(s);return g;}else{const top=this.mk(new THREE.SphereGeometry(h*0.3,8,6),key.includes('willow')?0x3CB371:0x228B22);top.position.y=h*0.6;g.add(top);}return g;}
+    if(key==='bush'){g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.5,6,5),0x2d7d2d),{position:new THREE.Vector3(0,h*0.35,0)}));return g;}
+    if(key==='grass-tuft'){g.add(Object.assign(this.mk(new THREE.ConeGeometry(0.12,h,4),0x4a8f2c),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key.startsWith('flower')){const cols={'flower-red':0xff4444,'flower-yellow':0xffd700,'flower-blue':0x4488ff};for(let i=0;i<5;i++){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.02,0.02,h*0.7,4),0x228B22),{position:new THREE.Vector3((Math.random()-0.5)*0.5,h*0.35,( Math.random()-0.5)*0.5)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.15,6,4),cols[key]||0xff4444),{position:new THREE.Vector3((Math.random()-0.5)*0.5,h*0.75,(Math.random()-0.5)*0.5)}));}return g;}
+    if(key==='hedge'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(3,h,0.8),0x2d7d2d),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='mushroom'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.08,0.1,h*0.6,6),0xf5deb3),{position:new THREE.Vector3(0,h*0.3,0)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.35,8,4),0xcc3333),{position:new THREE.Vector3(0,h*0.65,0)}));return g;}
+    if(key==='crop-row'){for(let i=0;i<8;i++)g.add(Object.assign(this.mk(new THREE.ConeGeometry(0.08,h,4),0xdaa520),{position:new THREE.Vector3(-2+i*0.6,h*0.5,0)}));return g;}
+    if(key==='haystack'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(h*0.4,h*0.5,h,8),0xdaa520),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='fallen-log'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.3,0.35,3,6),0x8B4513),{position:new THREE.Vector3(0,0.3,0),rotation:new THREE.Euler(0,0,Math.PI/2)}));return g;}
+    if(key.startsWith('rock')){g.add(Object.assign(this.mk(new THREE.DodecahedronGeometry(h*0.5,0),0x808080),{position:new THREE.Vector3(0,h*0.25,0)}));return g;}
+    if(key==='cliff'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(6,h,3),0x696969),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key.startsWith('mountain')||key==='hill'){g.add(Object.assign(this.mk(new THREE.ConeGeometry(h*0.5,h,5),0x6b7b6b),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key.includes('fence')){g.add(Object.assign(this.mk(new THREE.BoxGeometry(4,h,0.15),key.includes('stone')?0x808080:0x8B4513),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='gate'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(0.3,h,0.3),0x8B4513),{position:new THREE.Vector3(-1.5,h*0.5,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(0.3,h,0.3),0x8B4513),{position:new THREE.Vector3(1.5,h*0.5,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(3.3,0.3,0.3),0x8B4513),{position:new THREE.Vector3(0,h,0)}));return g;}
+    if(key==='well'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(1,1,h,8),0x808080),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='windmill'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(1.5,2.5,h*0.7,6),0xf5f5dc),{position:new THREE.Vector3(0,h*0.35,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(2,h*0.2,6),0x8B4513),{position:new THREE.Vector3(0,h*0.8,0)}));return g;}
+    if(key==='water-tower'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(2,2,h*0.4,8),0x4682B4),{position:new THREE.Vector3(0,h*0.8,0)}));for(let i=0;i<4;i++){const l=this.mk(new THREE.CylinderGeometry(0.15,0.15,h*0.6,4),0x696969);l.position.set(Math.cos(i*Math.PI/2)*1.5,h*0.3,Math.sin(i*Math.PI/2)*1.5);g.add(l);}return g;}
+    if(key==='market-stall'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(3,1.5,2),0x8B4513),{position:new THREE.Vector3(0,0.75,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(3.5,0.1,2.5),0xcc3333),{position:new THREE.Vector3(0,h,0)}));return g;}
+    if(key==='signpost'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.08,0.08,h,6),0x8B4513),{position:new THREE.Vector3(0,h*0.5,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(1.5,0.4,0.1),0xf5deb3),{position:new THREE.Vector3(0.5,h*0.8,0)}));return g;}
+    if(key==='lamp-post'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.06,0.08,h*0.85,6),0x333333),{position:new THREE.Vector3(0,h*0.42,0)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(0.3,8,6),0xffffaa),{position:new THREE.Vector3(0,h*0.9,0)}));return g;}
+    if(key==='bench'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(2,0.15,0.6),0x8B4513),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='barrel'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.4,0.4,h,8),0x8B4513),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='crate'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(h,h,h),0xdeb887),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='campfire'){g.add(Object.assign(this.mk(new THREE.ConeGeometry(0.5,h,6),0xff4500),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='tent'){g.add(Object.assign(this.mk(new THREE.ConeGeometry(h,h,4),0xf5deb3),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='flag'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.04,0.04,h,6),0x808080),{position:new THREE.Vector3(0,h*0.5,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(1,0.6,0.02),0xff0000),{position:new THREE.Vector3(0.5,h*0.8,0)}));return g;}
+    if(key==='fountain'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(1.2,1.5,h*0.5,8),0xb0b0b0),{position:new THREE.Vector3(0,h*0.25,0)}));return g;}
+    if(key==='pond'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(3,3,0.2,16),0x4488cc),{position:new THREE.Vector3(0,0.1,0)}));return g;}
+    if(key.startsWith('river')){g.add(Object.assign(this.mk(new THREE.BoxGeometry(2,0.15,8),0x4488cc),{position:new THREE.Vector3(0,0.08,0)}));return g;}
+    if(key.startsWith('worker')){const cols={'worker-farmer':0x228B22,'worker-baker':0xdaa520,'worker-factory':0x4682B4,'worker-processor':0xe67e22};g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.25,0.3,h*0.55,8),cols[key]||0x3498db),{position:new THREE.Vector3(0,h*0.3,0)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.14,8,6),0xFFDBAC),{position:new THREE.Vector3(0,h*0.72,0)}));return g;}
+    // generic
+    g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.6,h,h*0.6),0xaaaaaa),{position:new THREE.Vector3(0,h*0.5,0)}));
     return g;
   }
 
-  /** Shorthand: create a shadowed mesh */
-  m(geo, color) {
-    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
-  }
-
-  // ══════════════════════════════════════════════════════════
-  //  SCENE SETUP
-  // ══════════════════════════════════════════════════════════
-
   initScene() {
-    // Sky
-    const skyGeo = new THREE.SphereGeometry(2500, 32, 32);
-    const skyMat = new THREE.ShaderMaterial({
-      uniforms: {
-        topColor: { value: new THREE.Color(0x3a7bd5) },
-        bottomColor: { value: new THREE.Color(0xd4e8ff) },
-        offset: { value: 20 },
-        exponent: { value: 0.5 }
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 wp = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = wp.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor, bottomColor;
-        uniform float offset, exponent;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition + offset).y;
-          gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
-        }
-      `,
-      side: THREE.BackSide
-    });
-    this.scene.add(new THREE.Mesh(skyGeo, skyMat));
-
-    // Ground
-    const groundGeo = new THREE.PlaneGeometry(2000, 2000, 80, 80);
-    const pa = groundGeo.attributes.position;
-    for (let i = 0; i < pa.count; i++) {
-      const x = pa.getX(i), y = pa.getY(i);
-      pa.setZ(i, Math.sin(x * 0.008) * Math.cos(y * 0.008) * 2 + Math.sin(x * 0.02) * Math.cos(y * 0.015) * 0.8);
-    }
-    groundGeo.computeVertexNormals();
-    const ground = new THREE.Mesh(groundGeo, new THREE.MeshLambertMaterial({ color: 0x5a8f3c }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    this.scene.add(ground);
-
-    // Flat invisible plane for placement raycasting
-    const flat = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshBasicMaterial({ visible: false }));
-    flat.rotation.x = -Math.PI / 2;
-    this.scene.add(flat);
-    this.placementGround = flat;
+    const skyGeo=new THREE.SphereGeometry(2500,32,32);
+    const skyMat=new THREE.ShaderMaterial({uniforms:{topColor:{value:new THREE.Color(0x3a7bd5)},bottomColor:{value:new THREE.Color(0xd4e8ff)},offset:{value:20},exponent:{value:0.5}},vertexShader:`varying vec3 vWP;void main(){vec4 wp=modelMatrix*vec4(position,1.0);vWP=wp.xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`uniform vec3 topColor,bottomColor;uniform float offset,exponent;varying vec3 vWP;void main(){float h=normalize(vWP+offset).y;gl_FragColor=vec4(mix(bottomColor,topColor,max(pow(max(h,0.0),exponent),0.0)),1.0);}`,side:THREE.BackSide});
+    this.scene.add(new THREE.Mesh(skyGeo,skyMat));
+    const gGeo=new THREE.PlaneGeometry(2000,2000,80,80);const pa=gGeo.attributes.position;
+    for(let i=0;i<pa.count;i++){const x=pa.getX(i),y=pa.getY(i);pa.setZ(i,Math.sin(x*0.008)*Math.cos(y*0.008)*2+Math.sin(x*0.02)*Math.cos(y*0.015)*0.8);}
+    gGeo.computeVertexNormals();
+    const ground=new THREE.Mesh(gGeo,new THREE.MeshLambertMaterial({color:0x5a8f3c}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;this.scene.add(ground);
+    const flat=new THREE.Mesh(new THREE.PlaneGeometry(2000,2000),new THREE.MeshBasicMaterial({visible:false}));flat.rotation.x=-Math.PI/2;this.scene.add(flat);this.placementGround=flat;
   }
 
   setupLighting() {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-
-    const sun = new THREE.DirectionalLight(0xfff5e6, 1.0);
-    sun.position.set(100, 180, 80);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    const d = 250;
-    sun.shadow.camera.near = 1; sun.shadow.camera.far = 600;
-    sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
-    sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
+    this.scene.add(new THREE.AmbientLight(0xffffff,0.45));
+    const sun=new THREE.DirectionalLight(0xfff5e6,1.0);sun.position.set(100,180,80);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+    const d=250;sun.shadow.camera.near=1;sun.shadow.camera.far=600;sun.shadow.camera.left=-d;sun.shadow.camera.right=d;sun.shadow.camera.top=d;sun.shadow.camera.bottom=-d;
     this.scene.add(sun);
-
-    const fill = new THREE.DirectionalLight(0x8ec8ff, 0.2);
-    fill.position.set(-60, 80, -60);
-    this.scene.add(fill);
-
-    this.scene.add(new THREE.HemisphereLight(0x87CEEB, 0x5a8f3c, 0.25));
+    const fill=new THREE.DirectionalLight(0x8ec8ff,0.2);fill.position.set(-60,80,-60);this.scene.add(fill);
+    this.scene.add(new THREE.HemisphereLight(0x87CEEB,0x5a8f3c,0.25));
   }
 
-  // ══════════════════════════════════════════════════════════
-  //  INPUT: Mouse tracking + Keyboard pan + Arrow buttons
-  // ══════════════════════════════════════════════════════════
+  setupMouseTracking(){this.canvas.addEventListener('mousemove',(e)=>{const r=this.canvas.getBoundingClientRect();this.mouse.x=((e.clientX-r.left)/r.width)*2-1;this.mouse.y=-((e.clientY-r.top)/r.height)*2+1;if(this.placementMode&&this.previewBuilding)this.updatePreviewPosition();});}
+  updatePreviewPosition(){this.raycaster.setFromCamera(this.mouse,this.camera);const h=this.raycaster.intersectObject(this.placementGround);if(h.length>0){const p=h[0].point;this.previewBuilding.position.set(Math.round(p.x/5)*5,0,Math.round(p.z/5)*5);}}
 
-  setupMouseTracking() {
-    this.canvas.addEventListener('mousemove', (e) => {
-      const r = this.canvas.getBoundingClientRect();
-      this.mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
-      this.mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
-      if (this.placementMode && this.previewBuilding) this.updatePreviewPosition();
-    });
+  setupKeyboardPan(){
+    window.addEventListener('keydown',(e)=>{if(e.key==='ArrowLeft'||e.key==='a')this.panKeys.left=true;if(e.key==='ArrowRight'||e.key==='d')this.panKeys.right=true;if(e.key==='ArrowUp'||e.key==='w')this.panKeys.up=true;if(e.key==='ArrowDown'||e.key==='s')this.panKeys.down=true;});
+    window.addEventListener('keyup',(e)=>{if(e.key==='ArrowLeft'||e.key==='a')this.panKeys.left=false;if(e.key==='ArrowRight'||e.key==='d')this.panKeys.right=false;if(e.key==='ArrowUp'||e.key==='w')this.panKeys.up=false;if(e.key==='ArrowDown'||e.key==='s')this.panKeys.down=false;});
   }
 
-  updatePreviewPosition() {
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const hits = this.raycaster.intersectObject(this.placementGround);
-    if (hits.length > 0) {
-      const p = hits[0].point;
-      this.previewBuilding.position.set(Math.round(p.x / 5) * 5, 0, Math.round(p.z / 5) * 5);
-    }
+  startPan(d){this.panKeys[d]=true;} stopPan(d){this.panKeys[d]=false;} stopAllPan(){this.panKeys.left=this.panKeys.right=this.panKeys.up=this.panKeys.down=false;}
+  applyPan(dt){const sp=this.panSpeed*dt;const fw=new THREE.Vector3();this.camera.getWorldDirection(fw);fw.y=0;fw.normalize();const rt=new THREE.Vector3();rt.crossVectors(fw,new THREE.Vector3(0,1,0)).normalize();const mv=new THREE.Vector3();if(this.panKeys.up)mv.add(fw.clone().multiplyScalar(sp));if(this.panKeys.down)mv.add(fw.clone().multiplyScalar(-sp));if(this.panKeys.right)mv.add(rt.clone().multiplyScalar(sp));if(this.panKeys.left)mv.add(rt.clone().multiplyScalar(-sp));if(mv.lengthSq()>0){this.camera.position.add(mv);this.controls.target.add(mv);}}
+
+  createBuilding(type,position,id){const m=this.getModel(type);m.position.set(position.x,0,position.z);m.userData={id,type};this.scene.add(m);this.buildings.push(m);return m;}
+  createBuildingPreview(type){const m=this.getModel(type);m.traverse(c=>{if(c.isMesh){c.material=c.material.clone();c.material.transparent=true;c.material.opacity=0.4;}});const ring=new THREE.Mesh(new THREE.RingGeometry(7,8,32),new THREE.MeshBasicMaterial({color:0x2ecc71,transparent:true,opacity:0.35,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=0.05;m.add(ring);return m;}
+
+  loadCustomWorld(objects){this.landscapeObjects.forEach(o=>this.scene.remove(o));this.landscapeObjects=[];if(!objects||!objects.length)return;objects.forEach(obj=>{const m=this.getModelScaled(obj.modelId,obj.scale||1.0);m.position.set(obj.x,obj.y||0,obj.z);m.rotation.set(obj.rotX||0,obj.rotY||0,obj.rotZ||0);this.scene.add(m);this.landscapeObjects.push(m);});}
+
+  generateWorld(){
+    const ring=(m,cx,cz,n,sx,sz,sr)=>{for(let i=0;i<n;i++){const o=this.getModelScaled(m,sr[0]+Math.random()*(sr[1]-sr[0]));o.position.set(cx+(Math.random()-0.5)*sx,0,cz+(Math.random()-0.5)*sz);o.rotation.y=Math.random()*Math.PI*2;this.scene.add(o);this.landscapeObjects.push(o);}};
+    const sc=(m,cx,cz,n,sx,sz,sr,av)=>{for(let i=0;i<n;i++){const x=cx+(Math.random()-0.5)*sx,z=cz+(Math.random()-0.5)*sz;if(Math.abs(x)<av&&Math.abs(z)<av)continue;const o=this.getModelScaled(m,sr[0]+Math.random()*(sr[1]-sr[0]));o.position.set(x,0,z);o.rotation.y=Math.random()*Math.PI*2;this.scene.add(o);this.landscapeObjects.push(o);}};
+    ring('mountain-high',0,-350,5,500,80,[0.8,1.4]);ring('mountain-low',0,-280,7,550,60,[0.6,1.2]);
+    ring('mountain-low',-350,0,4,80,300,[0.5,1.0]);ring('mountain-low',350,0,4,80,300,[0.5,1.0]);
+    ring('tree-oak',-100,-100,12,70,60,[0.7,1.3]);ring('tree-pine',-120,-80,8,50,40,[0.8,1.2]);
+    ring('bush',-110,-90,10,80,60,[0.6,1.3]);ring('tree-pine',110,-100,10,60,50,[0.7,1.3]);
+    ring('tree-oak',-100,80,8,50,40,[0.7,1.2]);ring('tree-pine',100,90,7,50,45,[0.8,1.2]);
+    ring('tree-oak',0,160,8,80,40,[0.7,1.3]);
+    sc('grass-tuft',0,0,40,300,300,[0.5,1.5],25);sc('rock-large',0,0,10,250,250,[0.6,1.3],20);sc('rock-small',0,0,18,280,280,[0.5,1.4],15);
   }
 
-  setupKeyboardPan() {
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a') this.panKeys.left = true;
-      if (e.key === 'ArrowRight' || e.key === 'd') this.panKeys.right = true;
-      if (e.key === 'ArrowUp' || e.key === 'w') this.panKeys.up = true;
-      if (e.key === 'ArrowDown' || e.key === 's') this.panKeys.down = true;
-    });
-    window.addEventListener('keyup', (e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a') this.panKeys.left = false;
-      if (e.key === 'ArrowRight' || e.key === 'd') this.panKeys.right = false;
-      if (e.key === 'ArrowUp' || e.key === 'w') this.panKeys.up = false;
-      if (e.key === 'ArrowDown' || e.key === 's') this.panKeys.down = false;
-    });
-  }
-
-  /** Called from Game3D UI buttons */
-  startPan(direction) { this.panKeys[direction] = true; }
-  stopPan(direction) { this.panKeys[direction] = false; }
-  stopAllPan() { this.panKeys.left = this.panKeys.right = this.panKeys.up = this.panKeys.down = false; }
-
-  applyPan(dt) {
-    const speed = this.panSpeed * dt;
-    // Get camera's forward and right directions projected on XZ plane
-    const forward = new THREE.Vector3();
-    this.camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-
-    const right = new THREE.Vector3();
-    right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-    const move = new THREE.Vector3();
-    if (this.panKeys.up) move.add(forward.clone().multiplyScalar(speed));
-    if (this.panKeys.down) move.add(forward.clone().multiplyScalar(-speed));
-    if (this.panKeys.right) move.add(right.clone().multiplyScalar(speed));
-    if (this.panKeys.left) move.add(right.clone().multiplyScalar(-speed));
-
-    if (move.lengthSq() > 0) {
-      this.camera.position.add(move);
-      this.controls.target.add(move);
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════
-  //  BUILDINGS
-  // ══════════════════════════════════════════════════════════
-
-  createBuilding(type, position, id) {
-    const mesh = this.getModel(type); // getModel normalizes to lowercase
-    mesh.position.set(position.x, 0, position.z);
-    mesh.userData = { id, type };
-    this.scene.add(mesh);
-    this.buildings.push(mesh);
-
-    // Decorative workers near the building
-    this.spawnWorkersNear(type, position.x, position.z);
-    return mesh;
-  }
-
-  createBuildingPreview(type) {
-    const mesh = this.getModel(type);
-    mesh.traverse((child) => {
-      if (child.isMesh) {
-        child.material = child.material.clone();
-        child.material.transparent = true;
-        child.material.opacity = 0.4;
-      }
-    });
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(7, 8, 32),
-      new THREE.MeshBasicMaterial({ color: 0x2ecc71, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.05;
-    mesh.add(ring);
-    return mesh;
-  }
-
-  spawnWorkersNear(buildingType, bx, bz) {
-    const wt = buildingType === 'FARM' ? 'worker-farmer'
-             : buildingType === 'WAREHOUSE' ? 'worker-processor'
-             : 'worker-factory';
-    const n = buildingType === 'FARM' ? 3 : 2;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + Math.random() * 0.5;
-      const d = 8 + Math.random() * 4;
-      const w = this.getModel(wt);
-      w.position.set(bx + Math.cos(a) * d, 0, bz + Math.sin(a) * d);
-      w.rotation.y = Math.random() * Math.PI * 2;
-      w.userData = { isWorker: true, seed: Math.random() * 100 };
-      this.scene.add(w);
-      this.workers.push(w);
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════
-  //  WORLD GENERATION
-  // ══════════════════════════════════════════════════════════
-  //
-  //  Layout concept (top-down):
-  //
-  //     Mountains (far back, z = -250 to -400)
-  //     ────────────────────────────────────
-  //     Trees / Forest rings  (z = -80 to -180, and sides)
-  //
-  //     ┌─────────────────────────────┐
-  //     │   CLEAR CENTER  (±40)      │  ← player builds here
-  //     └─────────────────────────────┘
-  //
-  //     Trees / bushes (z = +60 to +180)
-  //     Mountains (far sides, optional)
-  //
-
-  generateWorld() {
-    // ─── MOUNTAINS: far background, anchored to ground ───
-    // Back range (behind everything)
-    this.ring('mountain-high', 0, -350, 5, 500, 80, [0.8, 1.4]);
-    this.ring('mountain-low',  0, -280, 7, 550, 60, [0.6, 1.2]);
-    // Left/right distant ranges
-    this.ring('mountain-low', -350, 0, 4, 80, 300, [0.5, 1.0]);
-    this.ring('mountain-low',  350, 0, 4, 80, 300, [0.5, 1.0]);
-
-    // ─── FORESTS: rings around the buildable center ───
-    // North-west forest
-    this.ring('tree-oak',  -100, -100, 12, 70, 60, [0.7, 1.3]);
-    this.ring('tree-pine', -120,  -80,  8, 50, 40, [0.8, 1.2]);
-    this.ring('bush',      -110,  -90, 10, 80, 60, [0.6, 1.3]);
-
-    // North-east forest
-    this.ring('tree-pine',  110, -100, 10, 60, 50, [0.7, 1.3]);
-    this.ring('tree-oak',   130,  -80,  6, 40, 40, [0.8, 1.2]);
-    this.ring('bush',       120,  -90,  8, 70, 50, [0.5, 1.2]);
-
-    // South-west grove
-    this.ring('tree-oak',  -100,  80,  8, 50, 40, [0.7, 1.2]);
-    this.ring('bush',       -90,  70,  6, 40, 30, [0.6, 1.1]);
-
-    // South-east grove
-    this.ring('tree-pine',  100,  90,  7, 50, 45, [0.8, 1.2]);
-    this.ring('tree-oak',   120,  70,  5, 35, 30, [0.7, 1.1]);
-
-    // Far south
-    this.ring('tree-oak',     0, 160,  8, 80, 40, [0.7, 1.3]);
-    this.ring('tree-pine',  -40, 180,  5, 50, 30, [0.8, 1.1]);
-
-    // ─── GRASS scattered all around (avoid center ±25) ───
-    this.scatter('grass-tuft', 0, 0, 40, 300, 300, [0.5, 1.5], 25);
-
-    // ─── ROCKS scattered (avoid center ±20) ───
-    this.scatter('rock-large', 0, 0, 10, 250, 250, [0.6, 1.3], 20);
-    this.scatter('rock-small', 0, 0, 18, 280, 280, [0.5, 1.4], 15);
-
-    // ─── DECORATIVE ITEMS near edge of build area ───
-    this.placeSingle('cotton-bundle', -25, -18, 1.0);
-    this.placeSingle('cotton-bundle', -22, -20, 0.8);
-    this.placeSingle('cloth-roll',    -20, -22, 1.0);
-    this.placeSingle('textile-box',   -17, -20, 0.9);
-
-    // ─── VEHICLES parked near edges ───
-    this.placeSingle('cart',  30, -18, 1.0, Math.PI * 0.3);
-    this.placeSingle('truck', -35, 25, 1.0, -Math.PI * 0.15);
-  }
-
-  /** Place models in a rectangular ring area */
-  ring(model, cx, cz, count, spreadX, spreadZ, scaleRange) {
-    for (let i = 0; i < count; i++) {
-      const x = cx + (Math.random() - 0.5) * spreadX;
-      const z = cz + (Math.random() - 0.5) * spreadZ;
-      const s = scaleRange[0] + Math.random() * (scaleRange[1] - scaleRange[0]);
-      const obj = this.getModelScaled(model, s);
-      obj.position.set(x, 0, z);
-      obj.rotation.y = Math.random() * Math.PI * 2;
-      this.scene.add(obj);
-      this.landscapeObjects.push(obj);
-    }
-  }
-
-  /** Scatter models, avoiding center radius */
-  scatter(model, cx, cz, count, spreadX, spreadZ, scaleRange, avoidRadius) {
-    for (let i = 0; i < count; i++) {
-      const x = cx + (Math.random() - 0.5) * spreadX;
-      const z = cz + (Math.random() - 0.5) * spreadZ;
-      if (Math.abs(x - cx) < avoidRadius && Math.abs(z - cz) < avoidRadius) continue;
-      const s = scaleRange[0] + Math.random() * (scaleRange[1] - scaleRange[0]);
-      const obj = this.getModelScaled(model, s);
-      obj.position.set(x, 0, z);
-      obj.rotation.y = Math.random() * Math.PI * 2;
-      this.scene.add(obj);
-      this.landscapeObjects.push(obj);
-    }
-  }
-
-  placeSingle(model, x, z, scale, rotY = 0) {
-    const obj = this.getModelScaled(model, scale);
-    obj.position.set(x, 0, z);
-    obj.rotation.y = rotY;
-    this.scene.add(obj);
-    this.landscapeObjects.push(obj);
-  }
-
-  /**
-   * Load a custom world from worldStore objects array.
-   * Clears existing landscape objects first.
-   * @param {Array} objects - [{ modelId, x, z, rotY, scale }, ...]
-   */
-  loadCustomWorld(objects) {
-    // Clear existing landscape
-    this.landscapeObjects.forEach(o => this.scene.remove(o));
-    this.landscapeObjects = [];
-
-    if (!objects || objects.length === 0) return;
-
-    objects.forEach(obj => {
-      const mesh = this.getModelScaled(obj.modelId, obj.scale || 1.0);
-      mesh.position.set(obj.x, 0, obj.z);
-      mesh.rotation.y = obj.rotY || 0;
-      this.scene.add(mesh);
-      this.landscapeObjects.push(mesh);
-    });
-
-    console.log(`✅ Custom world loaded: ${objects.length} objects`);
-  }
-
-  // ══════════════════════════════════════════════════════════
-  //  UPDATE / RENDER / LIFECYCLE
-  // ══════════════════════════════════════════════════════════
-
-  update(dt) {
-    this.controls.update();
-    this.applyPan(dt);
-
-    // Worker idle bob
-    const t = Date.now() * 0.001;
-    this.workers.forEach(w => {
-      if (w.userData.isWorker) {
-        w.position.y = Math.sin(t * 2 + w.userData.seed) * 0.08;
-        w.rotation.y += dt * 0.3;
-      }
-    });
-  }
-
-  render() {
-    this.renderer.render(this.scene, this.camera);
-  }
-
-  resize(w, h) {
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
-  }
-
-  dispose() {
-    this.controls?.dispose();
-    const geos = new Set(), mats = new Set();
-    this.scene?.traverse((o) => {
-      if (o.geometry) geos.add(o.geometry);
-      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => mats.add(m));
-    });
-    geos.forEach(g => g.dispose());
-    mats.forEach(m => m.dispose());
-    this.renderer?.dispose();
-    this.models.clear();
-    this.scene = null;
-    this.camera = null;
-    this.renderer = null;
-  }
+  update(dt){this.controls.update();this.applyPan(dt);}
+  render(){this.renderer.render(this.scene,this.camera);}
+  resize(w,h){this.camera.aspect=w/h;this.camera.updateProjectionMatrix();this.renderer.setSize(w,h);}
+  dispose(){this.controls?.dispose();const geos=new Set(),mats=new Set();this.scene?.traverse(o=>{if(o.geometry)geos.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});geos.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());this.renderer?.dispose();this.models.clear();this.scene=null;this.camera=null;this.renderer=null;}
 }

@@ -78,16 +78,15 @@ export default function WorldBuilder({ onBack, onPlay }) {
     worldStore.objects.forEach(obj => {
       if (!meshMap.current.has(obj.uid)) {
         const mesh = r.getModelScaled(obj.modelId, obj.scale);
-        mesh.position.set(obj.x, 0, obj.z);
-        mesh.rotation.y = obj.rotY;
+        mesh.position.set(obj.x, obj.y || 0, obj.z);
+        mesh.rotation.set(obj.rotX || 0, obj.rotY || 0, obj.rotZ || 0);
         mesh.userData = { builderUid: obj.uid, modelId: obj.modelId };
         r.scene.add(mesh);
         meshMap.current.set(obj.uid, mesh);
       } else {
-        // Update position/rotation/scale if changed
         const mesh = meshMap.current.get(obj.uid);
-        mesh.position.set(obj.x, 0, obj.z);
-        mesh.rotation.y = obj.rotY;
+        mesh.position.set(obj.x, obj.y || 0, obj.z);
+        mesh.rotation.set(obj.rotX || 0, obj.rotY || 0, obj.rotZ || 0);
       }
     });
   }, [worldStore.objects]);
@@ -334,55 +333,81 @@ export default function WorldBuilder({ onBack, onPlay }) {
       {/* ═══ RIGHT: SELECTED OBJECT PROPERTIES ═══ */}
       {selectedObjData && (
         <div style={{
-          position: 'fixed', top: 64, right: 14, width: 220,
-          ...panel, zIndex: 50,
+          position: 'fixed', top: 64, right: 14, width: 230,
+          ...panel, zIndex: 50, overflowY: 'auto', maxHeight: 'calc(100vh - 90px)',
         }} data-ui>
-          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>
-            Selected: {OBJECT_CATALOG.find(c => c.id === selectedObjData.modelId)?.label || selectedObjData.modelId}
+          <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 14 }}>
+            {OBJECT_CATALOG.find(c => c.id === selectedObjData.modelId)?.label || selectedObjData.modelId}
           </div>
-          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6 }}>
-            Position: ({selectedObjData.x}, {selectedObjData.z})
+          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 10 }}>
+            ({selectedObjData.x}, {(selectedObjData.y||0).toFixed(1)}, {selectedObjData.z})
           </div>
-          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
-            Rotation: {(selectedObjData.rotY / Math.PI * 180).toFixed(0)}° • Scale: {selectedObjData.scale}x
-          </div>
+
+          {/* Y Height */}
+          <SliderRow label="Height (Y)" value={selectedObjData.y || 0} min={-20} max={50} step={0.5}
+            color="#4ade80" format={v => `${v.toFixed(1)}`}
+            onChange={v => {
+              worldStore.updateObject(selectedObject, { y: v });
+              const mesh = meshMap.current.get(selectedObject);
+              if (mesh) mesh.position.y = v;
+            }} />
 
           {/* Scale */}
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Scale</div>
-            <input type="range" min="0.3" max="3.0" step="0.1" value={selectedObjData.scale}
-              onChange={e => {
-                const newScale = parseFloat(e.target.value);
-                worldStore.updateObject(selectedObject, { scale: newScale });
-                // Recreate mesh with new scale
-                const oldMesh = meshMap.current.get(selectedObject);
-                if (oldMesh) rendererRef.current?.scene.remove(oldMesh);
-                const newMesh = rendererRef.current?.getModelScaled(selectedObjData.modelId, newScale);
-                if (newMesh) {
-                  newMesh.position.set(selectedObjData.x, 0, selectedObjData.z);
-                  newMesh.rotation.y = selectedObjData.rotY;
-                  newMesh.userData = { builderUid: selectedObject, modelId: selectedObjData.modelId };
-                  rendererRef.current?.scene.add(newMesh);
-                  meshMap.current.set(selectedObject, newMesh);
-                }
-              }}
-              style={{ width: '100%', accentColor: '#60a5fa' }} />
-          </div>
+          <SliderRow label="Scale" value={selectedObjData.scale} min={0.1} max={5.0} step={0.1}
+            color="#60a5fa" format={v => `${v.toFixed(1)}x`}
+            onChange={v => {
+              worldStore.updateObject(selectedObject, { scale: v });
+              const oldMesh = meshMap.current.get(selectedObject);
+              if (oldMesh) rendererRef.current?.scene.remove(oldMesh);
+              const newMesh = rendererRef.current?.getModelScaled(selectedObjData.modelId, v);
+              if (newMesh) {
+                newMesh.position.set(selectedObjData.x, selectedObjData.y || 0, selectedObjData.z);
+                newMesh.rotation.set(selectedObjData.rotX || 0, selectedObjData.rotY || 0, selectedObjData.rotZ || 0);
+                newMesh.userData = { builderUid: selectedObject, modelId: selectedObjData.modelId };
+                rendererRef.current?.scene.add(newMesh);
+                meshMap.current.set(selectedObject, newMesh);
+              }
+            }} />
 
-          {/* Rotation */}
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Rotation</div>
-            <input type="range" min="0" max={Math.PI * 2} step="0.1" value={selectedObjData.rotY}
-              onChange={e => {
-                const rot = parseFloat(e.target.value);
-                worldStore.updateObject(selectedObject, { rotY: rot });
-                const mesh = meshMap.current.get(selectedObject);
-                if (mesh) mesh.rotation.y = rot;
-              }}
-              style={{ width: '100%', accentColor: '#60a5fa' }} />
-          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginTop: 8, marginBottom: 4 }}>Rotation</div>
 
-          <div style={{ display: 'flex', gap: 6 }}>
+          {/* Rotation X (Tilt forward/back) */}
+          <SliderRow label="Tilt X" value={(selectedObjData.rotX || 0)} min={-Math.PI} max={Math.PI} step={0.05}
+            color="#f472b6" format={v => `${(v / Math.PI * 180).toFixed(0)}°`}
+            onChange={v => {
+              worldStore.updateObject(selectedObject, { rotX: v });
+              const mesh = meshMap.current.get(selectedObject);
+              if (mesh) mesh.rotation.x = v;
+            }} />
+
+          {/* Rotation Y (Spin) */}
+          <SliderRow label="Spin Y" value={selectedObjData.rotY || 0} min={0} max={Math.PI * 2} step={0.05}
+            color="#fbbf24" format={v => `${(v / Math.PI * 180).toFixed(0)}°`}
+            onChange={v => {
+              worldStore.updateObject(selectedObject, { rotY: v });
+              const mesh = meshMap.current.get(selectedObject);
+              if (mesh) mesh.rotation.y = v;
+            }} />
+
+          {/* Rotation Z (Lean left/right) */}
+          <SliderRow label="Lean Z" value={(selectedObjData.rotZ || 0)} min={-Math.PI} max={Math.PI} step={0.05}
+            color="#a78bfa" format={v => `${(v / Math.PI * 180).toFixed(0)}°`}
+            onChange={v => {
+              worldStore.updateObject(selectedObject, { rotZ: v });
+              const mesh = meshMap.current.get(selectedObject);
+              if (mesh) mesh.rotation.z = v;
+            }} />
+
+          {/* Reset rotation */}
+          <button onClick={() => {
+            worldStore.updateObject(selectedObject, { rotX: 0, rotY: 0, rotZ: 0, y: 0 });
+            const mesh = meshMap.current.get(selectedObject);
+            if (mesh) { mesh.rotation.set(0, 0, 0); mesh.position.y = 0; }
+          }} style={{ ...toolBtn(false), width: '100%', marginTop: 6, fontSize: 10, color: '#94a3b8' }}>
+            ↺ Reset Transform
+          </button>
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             <button onClick={() => {
               worldStore.removeObject(selectedObject);
               const mesh = meshMap.current.get(selectedObject);
@@ -490,6 +515,20 @@ function NavDPad({ rendererRef }) {
       <div style={{ ...s, gridArea: 'c', background: 'rgba(100,150,200,0.08)', color: '#475569', fontSize: 10 }}>⊕</div>
       <button {...arrowBtn('right')} style={{ ...s, gridArea: 'right' }}>▶</button>
       <button {...arrowBtn('down')} style={{ ...s, gridArea: 'down' }}>▼</button>
+    </div>
+  );
+}
+
+function SliderRow({ label, value, min, max, step, color, format, onChange }) {
+  return (
+    <div style={{ marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>
+        <span>{label}</span>
+        <span style={{ color, fontWeight: 600 }}>{format(value)}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: color, height: 4 }} />
     </div>
   );
 }
