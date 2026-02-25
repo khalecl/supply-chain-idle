@@ -94,12 +94,31 @@ export const useWorldStore = create(
       // Objects now support: y, rotX, rotZ in addition to rotY
       objects: [],
       nextUid: 1,
-      gridSnap: true,  // toggle grid snapping
+      gridSnap: true,
+
+      // Underground resource system
+      resourceSeed: Math.floor(Math.random() * 999999),
+      surveyResults: {},  // key: "x,z" → { resource, timestamp }
+      showResourceDebug: false,
 
       worlds: {},
       activeWorld: null,
 
       toggleGridSnap: () => set(s => ({ gridSnap: !s.gridSnap })),
+      toggleResourceDebug: () => set(s => ({ showResourceDebug: !s.showResourceDebug })),
+      randomizeSeed: () => set({ resourceSeed: Math.floor(Math.random() * 999999), surveyResults: {} }),
+
+      addSurveyResult: (x, z, resource) => {
+        const key = `${Math.round(x)},${Math.round(z)}`;
+        set(s => ({
+          surveyResults: { ...s.surveyResults, [key]: { resource, timestamp: Date.now() } }
+        }));
+      },
+
+      getSurveyResult: (x, z) => {
+        const key = `${Math.round(x)},${Math.round(z)}`;
+        return get().surveyResults[key] || null;
+      },
 
       placeObject: (modelId, x, z, rotY = 0, scale = 1.0, y = 0) => {
         set(s => ({

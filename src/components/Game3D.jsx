@@ -3,15 +3,24 @@ import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { GameRenderer } from '../lib/three-renderer';
+import { ResourceMap } from '../lib/resource-map';
 import { CROPS, PROCESSORS, RESOURCES, ALL_RESOURCE_IDS } from '../data/crops';
+import { MINERALS } from '../data/minerals';
 import CropSelector from './CropSelector';
 
 export default function Game3D({ onBack }) {
   const canvasRef = useRef(null);
   const rendererRef = useRef(null);
+  const resourceMapRef = useRef(null);
 
   const [gs, setGs] = useState(useGameStore.getState());
   useEffect(() => useGameStore.subscribe(s => setGs(s)), []);
+
+  // Initialize resource map from world seed
+  useEffect(() => {
+    const seed = useWorldStore.getState().resourceSeed;
+    resourceMapRef.current = new ResourceMap(seed);
+  }, []);
 
   const [selectedBuilding, setSelectedBuilding] = useState(null); // 'FARM' or processorType
   const [showPrestige, setShowPrestige] = useState(false);
@@ -67,7 +76,6 @@ export default function Game3D({ onBack }) {
   const renderedIds = useRef(new Set());
   useEffect(() => {
     if (!rendererRef.current) return;
-    // Farms
     gs.farms.forEach(f => {
       const key = `FARM-${f.id}`;
       if (!renderedIds.current.has(key)) {
@@ -75,17 +83,47 @@ export default function Game3D({ onBack }) {
         renderedIds.current.add(key);
       }
     });
-    // Processors — map processorType to renderer building type
     gs.processors.forEach(p => {
       const key = `PROC-${p.id}`;
       if (!renderedIds.current.has(key)) {
-        // Use processorType as model key (warehouse, mill, bakery, etc.)
-        const modelType = p.processorType.toUpperCase();
-        rendererRef.current.createBuilding(modelType, p.position, p.id);
+        rendererRef.current.createBuilding(p.processorType.toUpperCase(), p.position, p.id);
         renderedIds.current.add(key);
       }
     });
-  }, [gs.farms, gs.processors]);
+    gs.mines.forEach(m => {
+      const key = `MINE-${m.id}`;
+      if (!renderedIds.current.has(key)) {
+        rendererRef.current.createBuilding('MINE', m.position, m.id);
+        renderedIds.current.add(key);
+      }
+    });
+    gs.surveyRigs.forEach(r => {
+      const key = `SRIG-${r.id}`;
+      if (!renderedIds.current.has(key)) {
+        rendererRef.current.createBuilding('SURVEYRIG', r.position, r.id);
+        renderedIds.current.add(key);
+      }
+    });
+  }, [gs.farms, gs.processors, gs.mines, gs.surveyRigs]);
+
+  // ─── Survey rig completion callback ───
+  useEffect(() => {
+    if (!resourceMapRef.current) return;
+    gs.surveyRigs.forEach(rig => {
+      if (!rig.isDone && rig.currentProduction >= 5000) {
+        const results = resourceMapRef.current.surveyArea(rig.position.x, rig.position.z, 20, 5);
+        useGameStore.getState().completeSurvey(rig.id, results);
+        // Store each result in worldStore
+        results.forEach(r => useWorldStore.getState().addSurveyResult(r.x, r.z, r.resource));
+        if (results.length > 0) {
+          const names = [...new Set(results.map(r => r.resource.name))].join(', ');
+          setToast(`🔍 Survey found: ${names}!`);
+        } else {
+          setToast('🔍 Survey complete — nothing found nearby.');
+        }
+      }
+    });
+  }, [gs.surveyRigs]);
 
   // ─── Placement ───
   const startPlacement = (type) => {
@@ -137,6 +175,25 @@ export default function Game3D({ onBack }) {
         if (state.money < 50) { setToast('Need $50!'); return; }
         const id = state.buyFarm(position);
         if (id !== null) { setToast('Farm placed! Select a crop.'); cancelPlacement(); }
+      } else if (selectedBuilding === 'SURVEY_RIG') {
+        if (state.money < 30) { setToast('Need $30!'); return; }
+        const id = state.buySurveyRig(position);
+        if (id !== null) { setToast('🔍 Survey rig deployed! Scanning...'); cancelPlacement(); }
+      } else if (selectedBuilding === 'MINE') {
+        if (state.money < 150) { setToast('Need $150!'); return; }
+        // Auto-survey the spot
+        const resource = resourceMapRef.current?.getResourceAt(position.x, position.z) || null;
+        const id = state.buyMine(position, resource);
+        if (id !== null) {
+          if (resource) {
+            setToast(`⛏️ ${resource.name} discovered! Mine operational.`);
+          } else {
+            setToast('❌ Nothing found here. Mine is empty.');
+          }
+          // Store survey result in worldStore
+          useWorldStore.getState().addSurveyResult(position.x, position.z, resource);
+          cancelPlacement();
+        }
       } else {
         // Processor
         const def = PROCESSORS[selectedBuilding];
@@ -158,7 +215,7 @@ export default function Game3D({ onBack }) {
   const arrow = (cur, prev) => Math.abs(cur - prev) < 0.01 ? '' : cur > prev ? ' ▲' : ' ▼';
   const pCol = (cur, prev) => Math.abs(cur - prev) < 0.01 ? '#94a3b8' : cur > prev ? '#4ade80' : '#f87171';
   const pm = 1 + gs.prestigeLevel * 0.05;
-  const totalBuildings = gs.farms.length + gs.processors.length;
+  const totalBuildings = gs.farms.length + gs.processors.length + gs.mines.length + gs.surveyRigs.length;
 
   // ─── STYLES ───
   const P = {
@@ -174,16 +231,20 @@ export default function Game3D({ onBack }) {
     transition: 'all 0.15s',
   });
 
-  // Group resources by category for display
+  // Group resources by category
   const resourceGroups = [
     { label: '🌱 Raw Crops', ids: ALL_RESOURCE_IDS.filter(id => RESOURCES[id].category === 'raw') },
+    { label: '⛏️ Minerals', ids: ALL_RESOURCE_IDS.filter(id => RESOURCES[id].category === 'mineral') },
+    { label: '⛽ Energy', ids: ALL_RESOURCE_IDS.filter(id => RESOURCES[id].category === 'energy') },
     { label: '⚙️ Processed', ids: ALL_RESOURCE_IDS.filter(id => RESOURCES[id].category === 'processed') },
     { label: '🏷️ Finished', ids: ALL_RESOURCE_IDS.filter(id => RESOURCES[id].category === 'finished') },
   ];
 
-  // Build buttons: Farm + all processor types
+  // Build buttons
   const buildOptions = [
     { type: 'FARM', icon: '🌱', cost: 50, label: 'Farm' },
+    { type: 'SURVEY_RIG', icon: '🔍', cost: 30, label: 'Survey' },
+    { type: 'MINE', icon: '⛏️', cost: 150, label: 'Mine' },
     ...Object.values(PROCESSORS).map(p => ({ type: p.id, icon: p.icon, cost: p.cost, label: p.name })),
   ];
 
@@ -522,8 +583,55 @@ function BuildingsList({ gs, pm, btnG, compact }) {
         });
       })}
 
-      {gs.processors.length === 0 && gs.farms.length > 0 && (
-        <Em text="Buy processing buildings to convert raw crops into higher-value products!" />
+      {gs.processors.length === 0 && gs.farms.length > 0 && gs.mines.length === 0 && (
+        <Em text="Buy processing buildings or mines to expand!" />
+      )}
+
+      {/* SURVEY RIGS */}
+      {gs.surveyRigs.length > 0 && (
+        <Sect title={`🔍 Survey Rigs (${gs.surveyRigs.length})`}>
+          {gs.surveyRigs.map((rig, i) => (
+            <Card key={rig.id} label={`Survey #${i + 1}`} color="#7dd3fc">
+              {rig.isDone ? (
+                <div style={{ fontSize: sz }}>
+                  {rig.results && rig.results.length > 0
+                    ? <span style={{ color: '#4ade80' }}>Found: {[...new Set(rig.results.map(r => r.resource.name))].join(', ')}</span>
+                    : <span style={{ color: '#f87171' }}>No resources found</span>
+                  }
+                </div>
+              ) : (
+                <>
+                  <PBar current={rig.currentProduction} max={5000} color="#7dd3fc" />
+                  <div style={{ fontSize: sz, color: '#94a3b8' }}>Scanning... {(rig.currentProduction / 1000).toFixed(1)}/5.0s</div>
+                </>
+              )}
+            </Card>
+          ))}
+        </Sect>
+      )}
+
+      {/* MINES */}
+      {gs.mines.length > 0 && (
+        <Sect title={`⛏️ Mines (${gs.mines.length})`}>
+          {gs.mines.map((mine, i) => (
+            <Card key={mine.id}
+              label={`Mine #${i + 1} — ${mine.resourceIcon} ${mine.resourceName}`}
+              color={mine.resourceId ? (RESOURCES[mine.resourceId]?.color || '#6b7280') : '#64748b'}>
+              {!mine.resourceId ? (
+                <div style={{ fontSize: sz, color: '#f87171' }}>Empty — no resources here</div>
+              ) : (
+                <>
+                  <PBar current={mine.currentProduction} max={mine.extractTime / pm} color={RESOURCES[mine.resourceId]?.color || '#6b7280'} />
+                  <button onClick={() => useGameStore.getState().harvestMine(mine.id)} disabled={!mine.isReady} style={btnG(mine.isReady)}>
+                    {mine.isReady
+                      ? `${mine.resourceIcon} Extract ($${mine.extractCost})`
+                      : `${compact ? '' : 'Extracting... '}${(mine.currentProduction / 1000).toFixed(1)}s`}
+                  </button>
+                </>
+              )}
+            </Card>
+          ))}
+        </Sect>
       )}
     </>
   );

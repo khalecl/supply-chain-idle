@@ -41,6 +41,9 @@ export class GameRenderer {
       'farm':6,'warehouse':5,'factory':8,'grain_farm':6,'mill':7,'bakery':6,
       'feedmill':5,'ethanolplant':6,'sugarmill':6,'candyfactory':5,
       'roaster':4,'packager':5,'tobaccoprocessor':5,
+      'surveyrig':3,'mine':6,
+      'smelteriron':6,'smeltercopper':6,'smeltergold':6,
+      'foundrysteel':6,'foundrywire':6,'foundrygold':6,
       'tree-oak':5,'tree-pine':6,'tree-willow':5.5,'tree-palm':7,'tree-dead':4,'tree-stump':1,
       'bush':1.2,'grass-tuft':0.5,'flower-red':0.6,'flower-yellow':0.7,'flower-blue':0.6,
       'hedge':1.8,'mushroom':0.5,'crop-row':0.8,'haystack':2,'fallen-log':1,
@@ -60,7 +63,7 @@ export class GameRenderer {
     const base = import.meta.env.BASE_URL || '/';
     this.modelManifest = {};
     const folders = {
-      buildings:['farm','warehouse','factory','grain_farm','mill','bakery','feedmill','ethanolplant','sugarmill','candyfactory','roaster','packager','tobaccoprocessor'],
+      buildings:['farm','warehouse','factory','grain_farm','mill','bakery','feedmill','ethanolplant','sugarmill','candyfactory','roaster','packager','tobaccoprocessor','surveyrig','mine','smelteriron','smeltercopper','smeltergold','foundrysteel','foundrywire','foundrygold'],
       characters:['worker-base','worker-farmer','worker-processor','worker-factory','worker-baker'],
       landscape:['tree-oak','tree-pine','tree-willow','tree-palm','tree-dead','tree-stump','bush','grass-tuft','flower-red','flower-yellow','flower-blue','hedge','mushroom','crop-row','haystack','fallen-log','rock-large','rock-small','rock-flat','rock-cluster','cliff','mountain-high','mountain-low','hill','pond','river-straight','river-bend'],
       structures:['fence-wood','fence-stone','gate','bridge-wood','well','windmill','water-tower','market-stall','signpost','lamp-post','bench'],
@@ -124,6 +127,10 @@ export class GameRenderer {
     if(key==='roaster'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(5,3,4),0x78350f),{position:new THREE.Vector3(0,1.5,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.4,0.4,4,6),0x451a03),{position:new THREE.Vector3(2,3.5,0)}));return g;}
     if(key==='packager'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,4,6),0x451a03),{position:new THREE.Vector3(0,2,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(8,0.3,7),0x78350f),{position:new THREE.Vector3(0,4.15,0)}));return g;}
     if(key==='tobaccoprocessor'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,4,5),0x57534e),{position:new THREE.Vector3(0,2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.5,0.6,5,6),0x78716c),{position:new THREE.Vector3(3,4.5,1)}));return g;}
+    if(key==='surveyrig'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.15,0.15,h*0.8,6),0x808080),{position:new THREE.Vector3(0,h*0.4,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(2,0.4,2),0x8B4513),{position:new THREE.Vector3(0,0.2,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(0.3,1,4),0xfbbf24),{position:new THREE.Vector3(0,h*0.85,0)}));return g;}
+    if(key==='mine'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(8,1,8),0x5c534e),{position:new THREE.Vector3(0,0.5,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0,3,4,4),0x78716c),{position:new THREE.Vector3(0,3,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(1.5,4,1.5),0x8B4513),{position:new THREE.Vector3(3,2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.3,0.3,2,6),0x333333),{position:new THREE.Vector3(3,4.5,0)}));return g;}
+    if(key.startsWith('smelter')){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,5,6),0x78350f),{position:new THREE.Vector3(0,2.5,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.8,1,6,8),0x991b1b),{position:new THREE.Vector3(2,5,1)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.6,0.8,5,8),0x991b1b),{position:new THREE.Vector3(-2,4.5,-1)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(0.5,6,4),0xff4500),{position:new THREE.Vector3(0,1,3)}));return g;}
+    if(key.startsWith('foundry')){g.add(Object.assign(this.mk(new THREE.BoxGeometry(9,5,7),0x4b5563),{position:new THREE.Vector3(0,2.5,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(10,0.4,8),0x374151),{position:new THREE.Vector3(0,5.2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.5,0.5,3,6),0x6b7280),{position:new THREE.Vector3(4,6.5,2)}));return g;}
     if(key.startsWith('tree')){const t=this.mk(new THREE.CylinderGeometry(0.2,0.35,h*0.4,6),0x8B4513);t.position.y=h*0.2;g.add(t);if(key.includes('pine')){for(let j=0;j<3;j++){const c=this.mk(new THREE.ConeGeometry(h*0.22-j*0.2,h*0.25,6),0x1a5c1a);c.position.y=h*0.42+j*h*0.18;g.add(c);}}else if(key.includes('palm')){for(let i=0;i<5;i++){const l=this.mk(new THREE.ConeGeometry(h*0.15,h*0.3,4),0x228B22);l.position.set(Math.cos(i*1.26)*1.5,h*0.75,Math.sin(i*1.26)*1.5);l.rotation.x=0.8;l.rotation.y=i*1.26;g.add(l);}}else if(key.includes('dead')){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.05,0.1,h*0.3,4),0x5c4033),{position:new THREE.Vector3(0.5,h*0.35,0)}));}else if(key.includes('stump')){const s=this.mk(new THREE.CylinderGeometry(0.6,0.7,h,8),0x8B4513);s.position.y=h*0.5;g.add(s);return g;}else{const top=this.mk(new THREE.SphereGeometry(h*0.3,8,6),key.includes('willow')?0x3CB371:0x228B22);top.position.y=h*0.6;g.add(top);}return g;}
     if(key==='bush'){g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.5,6,5),0x2d7d2d),{position:new THREE.Vector3(0,h*0.35,0)}));return g;}
     if(key==='grass-tuft'){g.add(Object.assign(this.mk(new THREE.ConeGeometry(0.12,h,4),0x4a8f2c),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}

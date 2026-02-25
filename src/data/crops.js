@@ -257,6 +257,92 @@ export const PROCESSORS = {
     chain: 'tobacco',
     description: 'Raw → Processed Tobacco (70% yield)',
   },
+
+  // ── Mineral Processing ──
+  smelterIron: {
+    id: 'smelterIron',
+    name: 'Iron Smelter',
+    icon: '🔥',
+    cost: 200,
+    opCost: 5,
+    processTime: 10000,
+    input: 'iron',
+    inputAmount: 1,
+    output: 'steel',
+    outputAmount: 0.8,
+    chain: 'mineral',
+    description: 'Iron Ore → Steel (80% yield)',
+  },
+  smelterCopper: {
+    id: 'smelterCopper',
+    name: 'Copper Smelter',
+    icon: '🔥',
+    cost: 200,
+    opCost: 5,
+    processTime: 10000,
+    input: 'copper',
+    inputAmount: 1,
+    output: 'wire',
+    outputAmount: 0.85,
+    chain: 'mineral',
+    description: 'Copper Ore → Wire (85% yield)',
+  },
+  smelterGold: {
+    id: 'smelterGold',
+    name: 'Gold Smelter',
+    icon: '🔥',
+    cost: 250,
+    opCost: 8,
+    processTime: 14000,
+    input: 'gold',
+    inputAmount: 1,
+    output: 'goldBars',
+    outputAmount: 0.7,
+    chain: 'mineral',
+    description: 'Gold Ore → Gold Bars (70% yield)',
+  },
+  foundrySteel: {
+    id: 'foundrySteel',
+    name: 'Tool Foundry',
+    icon: '🏭',
+    cost: 300,
+    opCost: 8,
+    processTime: 14000,
+    input: 'steel',
+    inputAmount: 2,
+    output: 'tools',
+    outputAmount: 1,
+    chain: 'mineral',
+    description: 'Steel → Tools (2:1)',
+  },
+  foundryWire: {
+    id: 'foundryWire',
+    name: 'Electronics Factory',
+    icon: '💻',
+    cost: 300,
+    opCost: 8,
+    processTime: 14000,
+    input: 'wire',
+    inputAmount: 2,
+    output: 'electronics',
+    outputAmount: 1,
+    chain: 'mineral',
+    description: 'Wire → Electronics (2:1)',
+  },
+  foundryGold: {
+    id: 'foundryGold',
+    name: 'Jeweler',
+    icon: '💍',
+    cost: 350,
+    opCost: 10,
+    processTime: 16000,
+    input: 'goldBars',
+    inputAmount: 1,
+    output: 'jewelry',
+    outputAmount: 1,
+    chain: 'mineral',
+    description: 'Gold Bars → Jewelry',
+  },
 };
 
 // ═══════════════════════════════════════════════════
@@ -295,6 +381,27 @@ export const RESOURCES = {
 
   // Processed — Tobacco
   processedTobacco: { name: 'Processed Tobacco',icon: '🚬', color: '#57534e', category: 'finished', basePrice: 14.00, min: 12.00, max: 20.00 },
+
+  // ── Minerals (raw) ──
+  iron:             { name: 'Iron Ore',         icon: '⛏️', color: '#b91c1c', category: 'mineral',   basePrice: 3.50,  min: 2.00,  max: 5.00 },
+  copper:           { name: 'Copper Ore',       icon: '🟤', color: '#c2410c', category: 'mineral',   basePrice: 4.00,  min: 3.00,  max: 6.00 },
+  coal:             { name: 'Coal',             icon: '⚫', color: '#44403c', category: 'mineral',   basePrice: 1.80,  min: 1.00,  max: 3.00 },
+  gold:             { name: 'Gold Ore',         icon: '✨', color: '#eab308', category: 'mineral',   basePrice: 22.00, min: 15.00, max: 30.00 },
+  diamonds:         { name: 'Diamonds',         icon: '💎', color: '#67e8f9', category: 'mineral',   basePrice: 55.00, min: 40.00, max: 80.00 },
+
+  // ── Oil & Gas (raw) ──
+  oil:              { name: 'Crude Oil',        icon: '🛢️', color: '#4c1d95', category: 'energy',    basePrice: 8.00,  min: 5.00,  max: 12.00 },
+  gas:              { name: 'Natural Gas',      icon: '💨', color: '#7dd3fc', category: 'energy',    basePrice: 5.00,  min: 3.00,  max: 8.00 },
+
+  // ── Refined Minerals ──
+  steel:            { name: 'Steel',            icon: '🔩', color: '#6b7280', category: 'processed', basePrice: 8.00,  min: 4.00,  max: 12.00 },
+  wire:             { name: 'Copper Wire',      icon: '🔌', color: '#ea580c', category: 'processed', basePrice: 7.00,  min: 4.00,  max: 10.00 },
+  goldBars:         { name: 'Gold Bars',        icon: '🥇', color: '#ca8a04', category: 'processed', basePrice: 45.00, min: 30.00, max: 60.00 },
+
+  // ── Finished Mineral Products ──
+  tools:            { name: 'Tools',            icon: '🔧', color: '#4b5563', category: 'finished',  basePrice: 20.00, min: 12.00, max: 28.00 },
+  electronics:      { name: 'Electronics',      icon: '💻', color: '#2563eb', category: 'finished',  basePrice: 18.00, min: 10.00, max: 25.00 },
+  jewelry:          { name: 'Jewelry',          icon: '💍', color: '#fbbf24', category: 'finished',  basePrice: 70.00, min: 50.00, max: 95.00 },
 };
 
 // Helper: get all resource IDs

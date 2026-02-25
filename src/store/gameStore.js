@@ -25,6 +25,8 @@ export const useGameStore = create(
       // Unified buildings
       farms: [],           // each has cropType
       processors: [],      // each has processorType
+      mines: [],           // each has resourceFound (mineral id or null)
+      surveyRigs: [],      // each has status: 'surveying' | 'done', results
       buildingIdCounter: 0,
 
       marketPrices: initPrices(),
@@ -32,6 +34,7 @@ export const useGameStore = create(
       prestigeLevel: 0,
       gameTime: 0,
       lastHarvestEvent: null,
+      lastDiscoveryEvent: null,  // { type, resource, buildingId, timestamp }
 
       // Farm awaiting crop selection
       pendingFarmId: null,
@@ -145,6 +148,81 @@ export const useGameStore = create(
         return true;
       },
 
+      // ═══ SURVEY RIGS ═══
+      // Place a survey rig to discover what's underground
+      // resourceMap is passed in from the component (ResourceMap instance)
+
+      buySurveyRig: (position) => {
+        const s = get();
+        if (s.money < 30) return null;
+        const id = s.buildingIdCounter;
+        set(s => ({
+          money: s.money - 30,
+          surveyRigs: [...s.surveyRigs, {
+            id, position,
+            currentProduction: 0,
+            isDone: false,
+            results: null,  // filled after survey completes
+          }],
+          buildingIdCounter: s.buildingIdCounter + 1,
+        }));
+        return id;
+      },
+
+      completeSurvey: (rigId, results) => {
+        // results: array of { x, z, resource } from ResourceMap.surveyArea()
+        set(s => ({
+          surveyRigs: s.surveyRigs.map(r => r.id === rigId
+            ? { ...r, isDone: true, results } : r),
+          lastDiscoveryEvent: results.length > 0
+            ? { type: 'SURVEY', resources: results.map(r => r.resource), buildingId: rigId, timestamp: Date.now() }
+            : { type: 'SURVEY_EMPTY', buildingId: rigId, timestamp: Date.now() },
+        }));
+      },
+
+      // ═══ MINES ═══
+      // Place a mine — auto-surveys the spot, if resource found → mine produces it
+
+      buyMine: (position, resourceFound) => {
+        // resourceFound: { id, name, icon, ... } from ResourceMap or null
+        const s = get();
+        if (s.money < 150) return null;
+        const id = s.buildingIdCounter;
+        set(s => ({
+          money: s.money - 150,
+          mines: [...s.mines, {
+            id, position,
+            resourceId: resourceFound?.id || null,
+            resourceName: resourceFound?.name || 'Nothing',
+            resourceIcon: resourceFound?.icon || '❌',
+            extractTime: resourceFound?.extractTime || 0,
+            extractCost: resourceFound?.extractCost || 0,
+            currentProduction: 0,
+            isReady: false,
+          }],
+          buildingIdCounter: s.buildingIdCounter + 1,
+          lastDiscoveryEvent: resourceFound
+            ? { type: 'MINE_FOUND', resource: resourceFound, buildingId: id, timestamp: Date.now() }
+            : { type: 'MINE_EMPTY', buildingId: id, timestamp: Date.now() },
+        }));
+        return id;
+      },
+
+      harvestMine: (mineId) => {
+        const s = get();
+        const mine = s.mines.find(m => m.id === mineId);
+        if (!mine || !mine.isReady || !mine.resourceId) return false;
+        if (s.money < mine.extractCost) return false;
+        set(s => ({
+          money: s.money - mine.extractCost,
+          resources: { ...s.resources, [mine.resourceId]: (s.resources[mine.resourceId] || 0) + 1 },
+          mines: s.mines.map(m => m.id === mineId
+            ? { ...m, isReady: false, currentProduction: 0 } : m),
+          lastHarvestEvent: { type: 'MINE', resource: mine.resourceId, buildingId: mineId, timestamp: Date.now() },
+        }));
+        return true;
+      },
+
       // ═══ SELL (any resource) ═══
 
       sellResource: (resourceId, amount) => {
@@ -196,6 +274,20 @@ export const useGameStore = create(
             if (newProd >= def.processTime / mult) return { ...proc, isReady: true, currentProduction: 0 };
             return { ...proc, currentProduction: newProd };
           }),
+          // Survey rigs: tick toward completion (5s)
+          surveyRigs: s.surveyRigs.map(rig => {
+            if (rig.isDone) return rig;
+            const newProd = rig.currentProduction + deltaTime * 1000;
+            if (newProd >= 5000) return { ...rig, currentProduction: 5000 }; // mark ready for completion callback
+            return { ...rig, currentProduction: newProd };
+          }),
+          // Mines: tick extraction
+          mines: s.mines.map(mine => {
+            if (mine.isReady || !mine.resourceId) return mine;
+            const newProd = mine.currentProduction + deltaTime * 1000;
+            if (newProd >= mine.extractTime / mult) return { ...mine, isReady: true, currentProduction: 0 };
+            return { ...mine, currentProduction: newProd };
+          }),
         }));
       },
 
@@ -213,9 +305,10 @@ export const useGameStore = create(
 
       reset: () => {
         set({
-          resources: initResources(), money: 100, farms: [], processors: [],
+          resources: initResources(), money: 100, farms: [], processors: [], mines: [], surveyRigs: [],
           buildingIdCounter: 0, marketPrices: initPrices(),
           lastPriceUpdate: 0, prestigeLevel: 0, gameTime: 0, pendingFarmId: null,
+          lastDiscoveryEvent: null,
         });
       },
 
