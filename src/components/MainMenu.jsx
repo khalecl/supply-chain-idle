@@ -106,69 +106,139 @@ export default function MainMenu({ onPlay, onWorldBuilder }) {
     };
   }, []);
 
-  const btn = (primary) => ({
-    padding: '14px 36px',
-    background: primary ? 'rgba(74, 222, 128, 0.2)' : 'rgba(100, 150, 200, 0.15)',
-    border: primary ? '2px solid rgba(74, 222, 128, 0.6)' : '1px solid rgba(100, 150, 200, 0.4)',
-    borderRadius: 10,
-    color: primary ? '#4ade80' : '#cbd5e1',
-    fontWeight: 700,
-    fontSize: primary ? 18 : 15,
-    cursor: 'pointer',
-    fontFamily: "'Segoe UI', Arial, sans-serif",
-    transition: 'all 0.2s',
-    minWidth: 220,
-    textAlign: 'center',
-  });
-
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', fontFamily: "'Segoe UI', 'Roboto', Arial, sans-serif" }}>
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
 
-      {/* Overlay */}
+      {/* Premium Overlay with Gradient */}
       <div style={{
         position: 'fixed', inset: 0,
-        background: 'linear-gradient(180deg, rgba(10,15,26,0.3) 0%, rgba(10,15,26,0.7) 100%)',
+        background: 'linear-gradient(135deg, rgba(15,23,42,0.65) 0%, rgba(30,41,59,0.75) 50%, rgba(15,23,42,0.65) 100%)',
+        backdropFilter: 'blur(2px)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 20,
       }}>
-        {/* Title */}
+        {/* Main Content Container */}
         <div style={{
-          fontSize: 48, fontWeight: 800, color: '#fff',
-          fontFamily: "'Segoe UI', Arial, sans-serif",
-          textShadow: '0 4px 20px rgba(0,0,0,0.5)',
-          letterSpacing: '-1px',
-          marginBottom: 4,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32,
+          textAlign: 'center', maxWidth: 600,
         }}>
-          🏭 Supply Chain Idle
-        </div>
-        <div style={{
-          fontSize: 16, color: '#94a3b8',
-          fontFamily: "'Segoe UI', Arial, sans-serif",
-          marginBottom: 24,
-          textShadow: '0 2px 8px rgba(0,0,0,0.5)',
-        }}>
-          Build. Produce. Trade. Profit.
-        </div>
+          {/* Header Section with Accent Line */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+          }}>
+            {/* Accent line above */}
+            <div style={{
+              width: 80, height: 3,
+              background: 'linear-gradient(90deg, transparent, #4ade80, transparent)',
+              borderRadius: 2,
+            }} />
 
-        {/* Buttons */}
-        <button onClick={onPlay} style={btn(true)}
-          onMouseEnter={e => e.target.style.background = 'rgba(74, 222, 128, 0.35)'}
-          onMouseLeave={e => e.target.style.background = 'rgba(74, 222, 128, 0.2)'}>
-          ▶ Play Game
-        </button>
-        <button onClick={onWorldBuilder} style={btn(false)}
-          onMouseEnter={e => e.target.style.background = 'rgba(100, 150, 200, 0.25)'}
-          onMouseLeave={e => e.target.style.background = 'rgba(100, 150, 200, 0.15)'}>
-          🗺️ World Builder
-        </button>
+            {/* Main Title */}
+            <h1 style={{
+              fontSize: '3.5rem', fontWeight: 900, color: '#ffffff',
+              margin: 0, letterSpacing: '-1.5px',
+              textShadow: '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(74,222,128,0.2)',
+              lineHeight: 1.1,
+            }}>
+              🏭 Supply Chain Idle
+            </h1>
 
-        {/* Footer */}
-        <div style={{
-          position: 'absolute', bottom: 16, color: '#475569',
-          fontSize: 12, fontFamily: "'Segoe UI', Arial, sans-serif",
-        }}>
-          Arrow keys / WASD to navigate • Mouse to orbit & zoom
+            {/* Tagline */}
+            <p style={{
+              fontSize: '1.1rem', color: '#cbd5e1', fontWeight: 500,
+              margin: 0, letterSpacing: '0.5px',
+              textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}>
+              Build. Produce. Trade. Profit.
+            </p>
+
+            {/* Accent line below */}
+            <div style={{
+              width: 80, height: 3,
+              background: 'linear-gradient(90deg, transparent, #60a5fa, transparent)',
+              borderRadius: 2,
+            }} />
+          </div>
+
+          {/* Buttons Section */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 14,
+            width: '100%', maxWidth: 300,
+          }}>
+            {/* Primary Button - Play */}
+            <button
+              onClick={onPlay}
+              style={{
+                padding: '16px 32px',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                border: '2px solid #4ade80',
+                borderRadius: 10,
+                background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.15) 0%, rgba(74, 222, 128, 0.05) 100%)',
+                color: '#4ade80',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 4px 15px rgba(74, 222, 128, 0.1), inset 0 1px 0 rgba(255,255,255,0.1)',
+                textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                whiteSpace: 'nowrap',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+              onMouseEnter={e => {
+                e.target.style.background = 'linear-gradient(135deg, rgba(74, 222, 128, 0.25) 0%, rgba(74, 222, 128, 0.1) 100%)';
+                e.target.style.boxShadow = '0 6px 25px rgba(74, 222, 128, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)';
+                e.target.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={e => {
+                e.target.style.background = 'linear-gradient(135deg, rgba(74, 222, 128, 0.15) 0%, rgba(74, 222, 128, 0.05) 100%)';
+                e.target.style.boxShadow = '0 4px 15px rgba(74, 222, 128, 0.1), inset 0 1px 0 rgba(255,255,255,0.1)';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              ▶ Play Game
+            </button>
+
+            {/* Secondary Button - World Builder */}
+            <button
+              onClick={onWorldBuilder}
+              style={{
+                padding: '16px 32px',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                border: '2px solid rgba(96, 165, 250, 0.6)',
+                borderRadius: 10,
+                background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.08) 0%, rgba(96, 165, 250, 0.02) 100%)',
+                color: '#93c5fd',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 4px 15px rgba(96, 165, 250, 0.05), inset 0 1px 0 rgba(255,255,255,0.05)',
+                textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => {
+                e.target.style.background = 'linear-gradient(135deg, rgba(96, 165, 250, 0.15) 0%, rgba(96, 165, 250, 0.05) 100%)';
+                e.target.style.borderColor = 'rgba(96, 165, 250, 0.9)';
+                e.target.style.boxShadow = '0 6px 25px rgba(96, 165, 250, 0.15), inset 0 1px 0 rgba(255,255,255,0.1)';
+                e.target.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={e => {
+                e.target.style.background = 'linear-gradient(135deg, rgba(96, 165, 250, 0.08) 0%, rgba(96, 165, 250, 0.02) 100%)';
+                e.target.style.borderColor = 'rgba(96, 165, 250, 0.6)';
+                e.target.style.boxShadow = '0 4px 15px rgba(96, 165, 250, 0.05), inset 0 1px 0 rgba(255,255,255,0.05)';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              🗺️ World Builder
+            </button>
+          </div>
+
+          {/* Info Text */}
+          <div style={{
+            fontSize: '0.9rem', color: '#64748b', fontWeight: 500,
+            textShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          }}>
+            Use Arrow Keys / WASD to explore the world
+          </div>
         </div>
       </div>
     </div>

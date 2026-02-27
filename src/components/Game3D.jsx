@@ -217,18 +217,30 @@ export default function Game3D({ onBack }) {
   const pm = 1 + gs.prestigeLevel * 0.05;
   const totalBuildings = gs.farms.length + gs.processors.length + gs.mines.length + gs.surveyRigs.length;
 
-  // ─── STYLES ───
+  // ─── PREMIUM STYLES ───
   const P = {
-    background: 'rgba(15, 23, 42, 0.94)', border: '1px solid rgba(100, 150, 200, 0.35)',
-    borderRadius: 10, color: '#e2e8f0', fontFamily: "'Segoe UI', Arial, sans-serif",
-    fontSize: 13, backdropFilter: 'blur(10px)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+    background: 'rgba(20, 28, 48, 0.95)',
+    border: '1px solid rgba(71, 137, 217, 0.25)',
+    borderRadius: 12,
+    color: '#e2e8f0',
+    fontFamily: "'Segoe UI', 'Roboto', Arial, sans-serif",
+    fontSize: 13,
+    backdropFilter: 'blur(12px)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
   };
+
   const btnG = (on) => ({
-    width: '100%', padding: '5px 8px', fontSize: 11, fontWeight: 600, marginTop: 4,
-    background: on ? 'rgba(74, 222, 128, 0.2)' : 'rgba(100,100,100,0.1)',
-    border: on ? '1px solid rgba(74, 222, 128, 0.5)' : '1px solid rgba(100,100,100,0.2)',
-    borderRadius: 5, color: on ? '#4ade80' : '#64748b', cursor: on ? 'pointer' : 'not-allowed',
-    transition: 'all 0.15s',
+    width: '100%',
+    padding: '7px 10px',
+    fontSize: 12,
+    fontWeight: 600,
+    marginTop: 6,
+    background: on ? 'linear-gradient(135deg, rgba(74, 222, 128, 0.12) 0%, rgba(74, 222, 128, 0.06) 100%)' : 'rgba(71, 137, 217, 0.08)',
+    border: on ? '1px solid rgba(74, 222, 128, 0.35)' : '1px solid rgba(71, 137, 217, 0.15)',
+    borderRadius: 7,
+    color: on ? '#4ade80' : '#94a3b8',
+    cursor: on ? 'pointer' : 'not-allowed',
+    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
   });
 
   // Group resources by category
@@ -250,14 +262,14 @@ export default function Game3D({ onBack }) {
 
   // ════════════════════════════════
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', background: '#0f172a' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', background: '#0f172a', fontFamily: "'Segoe UI', 'Roboto', Arial, sans-serif" }}>
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
 
       {/* TOAST */}
       {toast && (
         <div style={{
           position: 'fixed', top: isMobile ? 8 : 16, left: '50%', transform: 'translateX(-50%)',
-          ...P, padding: '6px 14px', border: '1px solid rgba(251,191,36,0.4)',
+          ...P, padding: '8px 16px', border: '1px solid rgba(251,191,36,0.4)',
           color: '#fbbf24', zIndex: 200, fontWeight: 600, fontSize: 12,
         }} data-ui>{toast}</div>
       )}
@@ -277,44 +289,44 @@ export default function Game3D({ onBack }) {
           {/* Top bar */}
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-            ...P, borderRadius: 0, padding: '6px 10px',
-            display: 'flex', alignItems: 'center', gap: 6,
-            borderTop: 'none',
+            ...P, borderRadius: 0, padding: '8px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            borderTop: 'none', borderLeft: 'none', borderRight: 'none',
           }} data-ui>
-            {onBack && <button onClick={onBack} style={{ padding: '3px 6px', background: 'rgba(100,150,200,0.15)', border: '1px solid rgba(100,150,200,0.3)', borderRadius: 4, color: '#94a3b8', fontSize: 10, cursor: 'pointer' }}>←</button>}
-            <span style={{ fontWeight: 700, color: '#4ade80', fontSize: 15 }}>${gs.money.toFixed(0)}</span>
+            {onBack && <button onClick={onBack} style={{ padding: '4px 8px', background: 'rgba(71,137,217,0.15)', border: '1px solid rgba(71,137,217,0.3)', borderRadius: 5, color: '#93c5fd', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>← Back</button>}
+            <span style={{ fontWeight: 700, color: '#4ade80', fontSize: 16 }}>💰 ${gs.money.toFixed(0)}</span>
             <div style={{ flex: 1 }} />
-            <button onClick={() => setShowPrestige(true)} style={{ padding: '2px 6px', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', borderRadius: 4, color: '#fbbf24', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>⭐{gs.prestigeLevel}</button>
+            <button onClick={() => setShowPrestige(true)} style={{ padding: '3px 8px', background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 5, color: '#fbbf24', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>⭐{gs.prestigeLevel}</button>
           </div>
 
           {/* Tab buttons */}
-          <div style={{ position: 'fixed', top: 36, left: 6, zIndex: 55, display: 'flex', flexDirection: 'column', gap: 4 }} data-ui>
+          <div style={{ position: 'fixed', top: 40, left: 8, zIndex: 55, display: 'flex', flexDirection: 'column', gap: 4 }} data-ui>
             <TabBtn active={mobilePanel === 'inventory'} onClick={() => setMobilePanel(mobilePanel === 'inventory' ? null : 'inventory')} label="💰" />
             <TabBtn active={mobilePanel === 'buildings'} onClick={() => setMobilePanel(mobilePanel === 'buildings' ? null : 'buildings')} label={`🏗️`} />
           </div>
 
           {/* Slide-out: Inventory */}
           {mobilePanel === 'inventory' && (
-            <div style={{ position: 'fixed', top: 36, left: 0, bottom: 60, width: '75vw', maxWidth: 300, zIndex: 52, ...P, borderRadius: '0 10px 10px 0', padding: '10px 12px', overflowY: 'auto' }} data-ui>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>💰 Market</div>
+            <div style={{ position: 'fixed', top: 40, left: 0, bottom: 60, width: '75vw', maxWidth: 320, zIndex: 52, ...P, borderRadius: '0 12px 12px 0', padding: '12px 14px', overflowY: 'auto', borderLeft: 'none' }} data-ui>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, color: '#4ade80' }}>💰 Market</div>
               {resourceGroups.map(grp => {
                 const hasAny = grp.ids.some(id => gs.resources[id] > 0 || gs.marketPrices[id]);
                 if (!hasAny) return null;
                 return (
                   <div key={grp.label}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginTop: 6, marginBottom: 3 }}>{grp.label}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#7dd3fc', marginTop: 8, marginBottom: 4, letterSpacing: '0.5px' }}>{grp.label}</div>
                     {grp.ids.map(id => {
                       const r = RESOURCES[id];
                       const amt = Math.floor(gs.resources[id] || 0);
                       const price = gs.marketPrices[id] || 0;
                       return (
-                        <div key={id} style={{ marginBottom: 6, padding: '5px 6px', background: 'rgba(100,150,200,0.06)', borderRadius: 5 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                        <div key={id} style={{ marginBottom: 8, padding: '7px 8px', background: 'rgba(71,137,217,0.08)', borderRadius: 7, border: '1px solid rgba(71,137,217,0.1)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
                             <span>{r.icon} {r.name}: <b style={{ color: r.color }}>{amt}</b></span>
-                            <span style={{ color: pCol(price, prevPrices[id] || price), fontSize: 10 }}>${price.toFixed(2)}{arrow(price, prevPrices[id] || price)}</span>
+                            <span style={{ color: pCol(price, prevPrices[id] || price), fontSize: 11 }}>${price.toFixed(2)}{arrow(price, prevPrices[id] || price)}</span>
                           </div>
                           {amt >= 1 && (
-                            <button onClick={() => useGameStore.getState().sellResource(id, amt)} style={{ ...btnG(true), fontSize: 10, padding: '3px 5px' }}>
+                            <button onClick={() => useGameStore.getState().sellResource(id, amt)} style={{ ...btnG(true), fontSize: 11, padding: '4px 6px' }}>
                               Sell {amt} @ ${price.toFixed(2)}
                             </button>
                           )}
@@ -329,8 +341,8 @@ export default function Game3D({ onBack }) {
 
           {/* Slide-out: Buildings */}
           {mobilePanel === 'buildings' && (
-            <div style={{ position: 'fixed', top: 36, left: 0, bottom: 60, width: '75vw', maxWidth: 300, zIndex: 52, ...P, borderRadius: '0 10px 10px 0', padding: '10px 12px', overflowY: 'auto' }} data-ui>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>🏗️ Buildings ({totalBuildings})</div>
+            <div style={{ position: 'fixed', top: 40, left: 0, bottom: 60, width: '75vw', maxWidth: 320, zIndex: 52, ...P, borderRadius: '0 12px 12px 0', padding: '12px 14px', overflowY: 'auto', borderLeft: 'none' }} data-ui>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, color: '#7dd3fc' }}>🏗️ Buildings ({totalBuildings})</div>
               <BuildingsList gs={gs} pm={pm} btnG={btnG} compact />
             </div>
           )}
@@ -338,8 +350,8 @@ export default function Game3D({ onBack }) {
           {/* Bottom build bar */}
           <div style={{
             position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-            ...P, borderRadius: 0, padding: '4px 4px', overflowX: 'auto',
-            display: 'flex', gap: 3, borderBottom: 'none',
+            ...P, borderRadius: 0, padding: '6px 6px', overflowX: 'auto',
+            display: 'flex', gap: 4, borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
           }} data-ui>
             {buildOptions.map(b => {
               const can = gs.money >= b.cost;
@@ -347,45 +359,44 @@ export default function Game3D({ onBack }) {
               return (
                 <button key={b.type} onClick={() => startPlacement(b.type)} disabled={!can}
                   style={{
-                    padding: '4px 6px', minWidth: 44, flexShrink: 0,
-                    background: sel ? 'rgba(74,222,128,0.25)' : can ? 'rgba(100,150,200,0.12)' : 'rgba(40,40,40,0.15)',
-                    border: sel ? '2px solid #4ade80' : can ? '1px solid rgba(100,150,200,0.3)' : '1px solid rgba(60,60,60,0.15)',
-                    borderRadius: 5, color: sel ? '#4ade80' : can ? '#cbd5e1' : '#475569',
-                    fontWeight: 700, fontSize: 8, cursor: can ? 'pointer' : 'not-allowed',
+                    padding: '6px 8px', minWidth: 48, flexShrink: 0,
+                    background: sel ? 'linear-gradient(135deg, rgba(74,222,128,0.2), rgba(74,222,128,0.08))' : can ? 'rgba(71,137,217,0.12)' : 'rgba(40,40,40,0.1)',
+                    border: sel ? '1.5px solid #4ade80' : can ? '1px solid rgba(71,137,217,0.25)' : '1px solid rgba(60,60,60,0.15)',
+                    borderRadius: 7, color: sel ? '#4ade80' : can ? '#cbd5e1' : '#475569',
+                    fontWeight: 700, fontSize: 10, cursor: can ? 'pointer' : 'not-allowed',
                     whiteSpace: 'nowrap',
+                    transition: 'all 0.15s',
                   }}>{b.icon}${b.cost}</button>
               );
             })}
           </div>
 
-          <NavDPad rendererRef={rendererRef} bottom={42} size={28} />
+          <NavDPad rendererRef={rendererRef} bottom={48} size={30} />
         </>
       ) : (
         /* ═══ DESKTOP ═══ */
         <>
           {/* Top-left: Money + Inventory */}
-          <div style={{ position: 'fixed', top: 16, left: 16, zIndex: 50, ...P, padding: '14px 16px', minWidth: 230, maxHeight: 'calc(100vh - 100px)', overflowY: 'auto' }} data-ui>
-            {onBack && <button onClick={onBack} style={{ padding: '4px 10px', marginBottom: 8, width: '100%', background: 'rgba(100,150,200,0.12)', border: '1px solid rgba(100,150,200,0.3)', borderRadius: 5, color: '#94a3b8', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>← Main Menu</button>}
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#4ade80', marginBottom: 10 }}>💰 ${gs.money.toFixed(0)}</div>
+          <div style={{ position: 'fixed', top: 16, left: 16, zIndex: 50, ...P, padding: '16px 18px', minWidth: 260, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }} data-ui>
+            {onBack && <button onClick={onBack} style={{ padding: '6px 12px', marginBottom: 10, width: '100%', background: 'rgba(71,137,217,0.12)', border: '1px solid rgba(71,137,217,0.25)', borderRadius: 7, color: '#93c5fd', fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}>← Main Menu</button>}
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#4ade80', marginBottom: 12, letterSpacing: '-0.5px' }}>💰 ${gs.money.toFixed(0)}</div>
 
             {resourceGroups.map(grp => {
               const hasAny = grp.ids.some(id => (gs.resources[id] || 0) > 0);
-              // Always show raw crops, only show others if player has any
               if (grp.label !== '🌱 Raw Crops' && !hasAny) return null;
               return (
-                <div key={grp.label} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8, marginTop: 6 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>{grp.label}</div>
+                <div key={grp.label} style={{ borderTop: '1px solid rgba(71,137,217,0.15)', paddingTop: 10, marginTop: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#7dd3fc', marginBottom: 6, letterSpacing: '0.5px' }}>{grp.label}</div>
                   {grp.ids.map(id => {
                     const r = RESOURCES[id];
                     const amt = Math.floor(gs.resources[id] || 0);
                     const price = gs.marketPrices[id] || 0;
-                    // Hide resources with 0 amount (except raw crops)
                     if (amt === 0 && grp.label !== '🌱 Raw Crops') return null;
                     return (
-                      <div key={id} style={{ marginBottom: 6 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>{r.icon} {r.name}: <b style={{ color: r.color }}>{amt}</b></span>
-                          <span style={{ fontSize: 11, color: pCol(price, prevPrices[id] || price) }}>
+                      <div key={id} style={{ marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <span style={{ fontSize: 13 }}>{r.icon} {r.name}: <b style={{ color: r.color }}>{amt}</b></span>
+                          <span style={{ fontSize: 12, color: pCol(price, prevPrices[id] || price) }}>
                             ${price.toFixed(2)}{arrow(price, prevPrices[id] || price)}
                           </span>
                         </div>
@@ -402,15 +413,15 @@ export default function Game3D({ onBack }) {
             })}
 
             {gs.prestigeLevel > 0 && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, marginTop: 4, fontSize: 11, color: '#fbbf24' }}>
+              <div style={{ borderTop: '1px solid rgba(71,137,217,0.15)', paddingTop: 10, marginTop: 10, fontSize: 12, color: '#fbbf24', fontWeight: 600 }}>
                 ⭐ Prestige Lv.{gs.prestigeLevel} — +{((pm - 1) * 100).toFixed(0)}% speed
               </div>
             )}
           </div>
 
           {/* Buildings panel */}
-          <div style={{ position: 'fixed', top: 16, left: 264, zIndex: 50, ...P, padding: '14px 16px', width: 290, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }} data-ui>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
+          <div style={{ position: 'fixed', top: 16, left: 300, zIndex: 50, ...P, padding: '16px 18px', width: 320, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }} data-ui>
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, borderBottom: '2px solid rgba(71,137,217,0.2)', paddingBottom: 10, color: '#7dd3fc', letterSpacing: '-0.5px' }}>
               🏗️ Buildings ({totalBuildings})
             </div>
             <BuildingsList gs={gs} pm={pm} btnG={btnG} />
@@ -419,7 +430,7 @@ export default function Game3D({ onBack }) {
           {/* Bottom build bar */}
           <div style={{
             position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-            display: 'flex', gap: 5, zIndex: 50, ...P, padding: '8px 12px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '90vw',
+            display: 'flex', gap: 6, zIndex: 50, ...P, padding: '10px 14px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '90vw',
           }} data-ui>
             {buildOptions.map(b => {
               const can = gs.money >= b.cost;
@@ -427,11 +438,12 @@ export default function Game3D({ onBack }) {
               return (
                 <button key={b.type} onClick={() => startPlacement(b.type)} disabled={!can}
                   style={{
-                    padding: '5px 10px',
-                    background: sel ? 'rgba(74,222,128,0.25)' : can ? 'rgba(100,150,200,0.15)' : 'rgba(60,60,60,0.15)',
-                    border: sel ? '2px solid #4ade80' : can ? '1px solid rgba(100,150,200,0.4)' : '1px solid rgba(60,60,60,0.2)',
-                    borderRadius: 7, color: sel ? '#4ade80' : can ? '#cbd5e1' : '#475569',
-                    fontWeight: 700, fontSize: 11, cursor: can ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap',
+                    padding: '7px 12px',
+                    background: sel ? 'linear-gradient(135deg, rgba(74,222,128,0.2), rgba(74,222,128,0.08))' : can ? 'rgba(71,137,217,0.12)' : 'rgba(40,40,40,0.1)',
+                    border: sel ? '1.5px solid #4ade80' : can ? '1px solid rgba(71,137,217,0.25)' : '1px solid rgba(60,60,60,0.15)',
+                    borderRadius: 8, color: sel ? '#4ade80' : can ? '#cbd5e1' : '#475569',
+                    fontWeight: 700, fontSize: 12, cursor: can ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap',
+                    transition: 'all 0.15s',
                   }}>{b.icon} {b.label} ${b.cost}</button>
               );
             })}
@@ -439,29 +451,32 @@ export default function Game3D({ onBack }) {
 
           {/* Prestige button */}
           <button onClick={() => setShowPrestige(true)} style={{
-            position: 'fixed', bottom: 100, right: 16, padding: '10px 18px',
-            background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.5)',
-            borderRadius: 8, color: '#fbbf24', fontWeight: 700, fontSize: 13, cursor: 'pointer', zIndex: 50,
+            position: 'fixed', bottom: 110, right: 16, padding: '12px 20px',
+            background: 'linear-gradient(135deg, rgba(251,191,36,0.12), rgba(251,191,36,0.06))',
+            border: '1.5px solid rgba(251,191,36,0.35)',
+            borderRadius: 10, color: '#fbbf24', fontWeight: 700, fontSize: 14, cursor: 'pointer', zIndex: 50,
+            transition: 'all 0.15s',
+            boxShadow: '0 4px 15px rgba(251,191,36,0.05)',
           }} data-ui>⭐ Prestige (Lv.{gs.prestigeLevel})</button>
 
-          <NavDPad rendererRef={rendererRef} bottom={16} size={36} />
+          <NavDPad rendererRef={rendererRef} bottom={16} size={40} />
         </>
       )}
 
       {/* ═══ Prestige Modal ═══ */}
       {showPrestige && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }} onClick={() => setShowPrestige(false)}>
-          <div style={{ ...P, maxWidth: isMobile ? '85vw' : 400, textAlign: 'center', border: '2px solid rgba(251,191,36,0.6)', padding: isMobile ? '20px' : '28px 32px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 700, color: '#fbbf24', marginBottom: 12 }}>✨ Prestige Reset</div>
-            <div style={{ lineHeight: 1.7, color: '#cbd5e1', marginBottom: 16, fontSize: isMobile ? 12 : 14 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }} onClick={() => setShowPrestige(false)}>
+          <div style={{ ...P, maxWidth: isMobile ? '85vw' : 420, textAlign: 'center', border: '2px solid rgba(251,191,36,0.5)', padding: isMobile ? '24px' : '32px 36px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: isMobile ? 22 : 28, fontWeight: 800, color: '#fbbf24', marginBottom: 14, letterSpacing: '-0.5px' }}>✨ Prestige Reset</div>
+            <div style={{ lineHeight: 1.8, color: '#cbd5e1', marginBottom: 20, fontSize: isMobile ? 13 : 15 }}>
               <div>Level {gs.prestigeLevel} → <b style={{ color: '#fbbf24' }}>{gs.prestigeLevel + 1}</b></div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>✓ Reset resources & money to $100</div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>✓ Keep all buildings</div>
-              <div style={{ fontSize: 13, color: '#4ade80', fontWeight: 700, marginTop: 8 }}>⚡ Speed: {((pm + 0.05) * 100).toFixed(0)}% (+5%)</div>
+              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>✓ Reset resources & money to $100</div>
+              <div style={{ fontSize: 12, color: '#94a3b8' }}>✓ Keep all buildings</div>
+              <div style={{ fontSize: 14, color: '#4ade80', fontWeight: 700, marginTop: 10 }}>⚡ Speed: {((pm + 0.05) * 100).toFixed(0)}% (+5%)</div>
             </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button onClick={() => { useGameStore.getState().prestige(); setShowPrestige(false); }} style={{ padding: '8px 20px', background: 'rgba(251,191,36,0.2)', border: '2px solid rgba(251,191,36,0.6)', borderRadius: 8, color: '#fbbf24', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>Prestige Now</button>
-              <button onClick={() => setShowPrestige(false)} style={{ padding: '8px 20px', background: 'rgba(100,150,200,0.15)', border: '1px solid rgba(100,150,200,0.4)', borderRadius: 8, color: '#60a5fa', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button onClick={() => { useGameStore.getState().prestige(); setShowPrestige(false); }} style={{ padding: '10px 22px', background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.08))', border: '1.5px solid rgba(251,191,36,0.4)', borderRadius: 8, color: '#fbbf24', fontWeight: 700, cursor: 'pointer', fontSize: 14, transition: 'all 0.15s' }}>Prestige Now</button>
+              <button onClick={() => setShowPrestige(false)} style={{ padding: '10px 22px', background: 'rgba(71,137,217,0.12)', border: '1px solid rgba(71,137,217,0.25)', borderRadius: 8, color: '#93c5fd', fontWeight: 700, cursor: 'pointer', fontSize: 14, transition: 'all 0.15s' }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -470,16 +485,16 @@ export default function Game3D({ onBack }) {
       {/* Placement indicator */}
       {selectedBuilding && (
         <div style={{
-          position: 'fixed', top: isMobile ? 44 : '50%', left: '50%',
+          position: 'fixed', top: isMobile ? 50 : '50%', left: '50%',
           transform: isMobile ? 'translateX(-50%)' : 'translate(-50%, -50%)',
-          ...P, border: '2px solid rgba(74,222,128,0.7)',
-          padding: isMobile ? '8px 14px' : '16px 24px', textAlign: 'center', zIndex: 100,
+          ...P, border: '2px solid rgba(74,222,128,0.6)',
+          padding: isMobile ? '10px 16px' : '18px 28px', textAlign: 'center', zIndex: 100,
         }} data-ui>
-          <div style={{ color: '#4ade80', fontWeight: 700, fontSize: isMobile ? 12 : 15 }}>
+          <div style={{ color: '#4ade80', fontWeight: 700, fontSize: isMobile ? 13 : 16, letterSpacing: '-0.5px' }}>
             🎯 {isMobile ? 'Tap' : 'Click'} ground to place {selectedBuilding === 'FARM' ? 'Farm' : PROCESSORS[selectedBuilding]?.name || selectedBuilding}
           </div>
-          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>
-            {isMobile ? <button onClick={cancelPlacement} style={{ padding: '2px 8px', background: 'rgba(248,113,113,0.2)', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 4, color: '#f87171', fontSize: 10, cursor: 'pointer' }}>✕ Cancel</button> : 'ESC to cancel'}
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+            {isMobile ? <button onClick={cancelPlacement} style={{ padding: '3px 10px', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 5, color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>✕ Cancel</button> : 'ESC to cancel'}
           </div>
         </div>
       )}
@@ -487,10 +502,10 @@ export default function Game3D({ onBack }) {
       {/* First-time hint */}
       {totalBuildings === 0 && !selectedBuilding && gs.pendingFarmId === null && (
         <div style={{
-          position: 'fixed', bottom: isMobile ? 50 : 80, left: '50%', transform: 'translateX(-50%)',
-          ...P, border: '1px solid rgba(251,191,36,0.4)',
-          padding: isMobile ? '6px 12px' : '10px 20px', textAlign: 'center', zIndex: 40,
-          color: '#fbbf24', fontSize: isMobile ? 11 : 13,
+          position: 'fixed', bottom: isMobile ? 58 : 90, left: '50%', transform: 'translateX(-50%)',
+          ...P, border: '1px solid rgba(251,191,36,0.35)',
+          padding: isMobile ? '8px 14px' : '12px 22px', textAlign: 'center', zIndex: 40,
+          color: '#fbbf24', fontSize: isMobile ? 12 : 14, fontWeight: 600,
         }} data-ui>👆 Buy a Farm to start!</div>
       )}
 
@@ -503,7 +518,7 @@ export default function Game3D({ onBack }) {
 //  BuildingsList — renders all farms + processors
 // ═══════════════════════════════
 function BuildingsList({ gs, pm, btnG, compact }) {
-  const sz = compact ? 10 : 11;
+  const sz = compact ? 11 : 12;
 
   return (
     <>
@@ -642,18 +657,20 @@ function BuildingsList({ gs, pm, btnG, compact }) {
 function TabBtn({ active, onClick, label }) {
   return (
     <button onClick={onClick} data-ui style={{
-      width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: active ? 'rgba(74,222,128,0.25)' : 'rgba(15,23,42,0.9)',
-      border: active ? '2px solid #4ade80' : '1px solid rgba(100,150,200,0.35)',
-      borderRadius: 8, fontSize: 14, cursor: 'pointer', color: active ? '#4ade80' : '#cbd5e1',
+      width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: active ? 'linear-gradient(135deg, rgba(74,222,128,0.15), rgba(74,222,128,0.08))' : 'rgba(20,28,48,0.9)',
+      border: active ? '1.5px solid #4ade80' : '1px solid rgba(71,137,217,0.25)',
+      borderRadius: 9, fontSize: 16, cursor: 'pointer', color: active ? '#4ade80' : '#cbd5e1',
+      transition: 'all 0.15s',
+      boxShadow: active ? '0 4px 15px rgba(74,222,128,0.1)' : 'none',
     }}>{label}</button>
   );
 }
 
 function Sect({ title, children }) {
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ fontWeight: 600, fontSize: 11, padding: '5px 8px', background: 'rgba(100,150,200,0.1)', borderRadius: 5, marginBottom: 5 }}>{title}</div>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontWeight: 700, fontSize: 11, padding: '6px 9px', background: 'rgba(71,137,217,0.1)', borderRadius: 6, marginBottom: 6, color: '#93c5fd', letterSpacing: '0.3px' }}>{title}</div>
       {children}
     </div>
   );
@@ -661,8 +678,8 @@ function Sect({ title, children }) {
 
 function Card({ label, color, children }) {
   return (
-    <div style={{ background: 'rgba(100,150,200,0.08)', padding: '6px 8px', borderRadius: 6, marginBottom: 5, borderLeft: `3px solid ${color}` }}>
-      <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 3 }}>{label}</div>
+    <div style={{ background: 'rgba(71,137,217,0.08)', padding: '8px 10px', borderRadius: 8, marginBottom: 6, borderLeft: `3px solid ${color}`, border: `1px solid rgba(71,137,217,0.12)`, borderLeftWidth: 3 }}>
+      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4, color: '#cbd5e1' }}>{label}</div>
       {children}
     </div>
   );
@@ -670,17 +687,17 @@ function Card({ label, color, children }) {
 
 function PBar({ current, max, color }) {
   return (
-    <div style={{ background: 'rgba(100,100,100,0.2)', height: 4, borderRadius: 3, margin: '3px 0' }}>
-      <div style={{ height: '100%', width: `${Math.min(100, (current / max) * 100)}%`, background: color, borderRadius: 3, transition: 'width 0.1s' }} />
+    <div style={{ background: 'rgba(71,137,217,0.15)', height: 5, borderRadius: 3, margin: '4px 0', overflow: 'hidden' }}>
+      <div style={{ height: '100%', width: `${Math.min(100, (current / max) * 100)}%`, background: color, borderRadius: 3, transition: 'width 0.1s', boxShadow: `0 0 8px ${color}40` }} />
     </div>
   );
 }
 
 function Em({ text }) {
-  return <div style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', padding: '2px 4px' }}>{text}</div>;
+  return <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', padding: '3px 5px' }}>{text}</div>;
 }
 
-function NavDPad({ rendererRef, bottom = 16, size = 36 }) {
+function NavDPad({ rendererRef, bottom = 16, size = 40 }) {
   const ab = (dir) => ({
     onMouseDown: () => rendererRef.current?.startPan(dir),
     onMouseUp: () => rendererRef.current?.stopPan(dir),
@@ -690,18 +707,19 @@ function NavDPad({ rendererRef, bottom = 16, size = 36 }) {
   });
   const s = {
     width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(100,150,200,0.2)', border: '1px solid rgba(100,150,200,0.4)',
-    borderRadius: 6, color: '#cbd5e1', fontSize: size * 0.42, cursor: 'pointer', userSelect: 'none',
+    background: 'rgba(71,137,217,0.15)', border: '1px solid rgba(71,137,217,0.25)',
+    borderRadius: 8, color: '#93c5fd', fontSize: size * 0.4, cursor: 'pointer', userSelect: 'none',
+    transition: 'all 0.15s',
   };
   return (
     <div style={{
-      position: 'fixed', bottom, right: 10, zIndex: 50,
+      position: 'fixed', bottom, right: 12, zIndex: 50,
       display: 'grid', gridTemplateAreas: `". u ." "l c r" ". d ."`,
-      gridTemplateColumns: `${size}px ${size}px ${size}px`, gridTemplateRows: `${size}px ${size}px ${size}px`, gap: 2,
+      gridTemplateColumns: `${size}px ${size}px ${size}px`, gridTemplateRows: `${size}px ${size}px ${size}px`, gap: 3,
     }} data-ui>
       <button {...ab('up')} style={{ ...s, gridArea: 'u' }}>▲</button>
       <button {...ab('left')} style={{ ...s, gridArea: 'l' }}>◀</button>
-      <div style={{ ...s, gridArea: 'c', background: 'rgba(100,150,200,0.08)', color: '#475569', fontSize: size * 0.28 }}>⊕</div>
+      <div style={{ ...s, gridArea: 'c', background: 'rgba(71,137,217,0.08)', color: '#475569', fontSize: size * 0.28 }}>⊕</div>
       <button {...ab('right')} style={{ ...s, gridArea: 'r' }}>▶</button>
       <button {...ab('down')} style={{ ...s, gridArea: 'd' }}>▼</button>
     </div>
