@@ -46,7 +46,7 @@ export class GameRenderer {
     this.gltfLoader = new GLTFLoader();
 
     this.targetSizes = {
-      'farm':6,'warehouse':5,'factory':8,'grain_farm':6,'mill':7,'bakery':6,
+      'farm':6,'warehouse':5,'factory':8,'grain_farm':6,'mill':7,'bakery':6,'farm-upgraded':7,'workshop':6,
       'feedmill':5,'ethanolplant':6,'sugarmill':6,'candyfactory':5,
       'roaster':4,'packager':5,'tobaccoprocessor':5,
       'surveyrig':3,'mine':6,
@@ -63,25 +63,46 @@ export class GameRenderer {
       'campfire':1,'tent':2.5,'flag':3,'fountain':2.5,
       'cotton-bundle':0.6,'cloth-roll':0.8,'textile-box':0.8,
       'wheat-bundle':0.6,'flour-sack':0.7,'bread-basket':0.5,
-      'cart':2,'truck':3,'wagon':2.5,'boat':2,
-      'worker-base':1.6,'worker-farmer':1.6,'worker-processor':1.6,'worker-factory':1.6,'worker-baker':1.6,
-      'pond':1,'river-straight':0.5,'river-bend':0.5,
+      'cart':2,'truck':3,'wagon':2.5,'boat':2,'ship':2,
+      'worker-base':1.6,'worker-farmer':1.6,'worker-processor':1.6,'worker-factory':1.6,'worker-baker':1.6,'npc-merchant':1.6,
+      'pond':1,'river-straight':0.5,'river-bend':0.5,'water-pond':1,
+      'coin':0.3,'chest':1.2,
+      'dust-particles':2,'fire-particle':1.5,'smoke-particle':2,'spark-particle':1,
+      'arrow':0.5,'flag-ui':0.8,'star-ui':0.6,
     };
 
     const base = import.meta.env.BASE_URL || '/';
     this.modelManifest = {};
     const folders = {
-      buildings:['farm','warehouse','factory','grain_farm','mill','bakery','feedmill','ethanolplant','sugarmill','candyfactory','roaster','packager','tobaccoprocessor','surveyrig','mine','smelteriron','smeltercopper','smeltergold','foundrysteel','foundrywire','foundrygold'],
-      characters:['worker-base','worker-farmer','worker-processor','worker-factory','worker-baker'],
-      landscape:['tree-oak','tree-pine','tree-willow','tree-palm','tree-dead','tree-stump','bush','grass-tuft','flower-red','flower-yellow','flower-blue','hedge','mushroom','crop-row','haystack','fallen-log','rock-large','rock-small','rock-flat','rock-cluster','cliff','mountain-high','mountain-low','hill','pond','river-straight','river-bend'],
+      buildings:['farm','warehouse','factory','grain_farm','mill','bakery','farm-upgraded','workshop','feedmill','ethanolplant','sugarmill','candyfactory','roaster','packager','tobaccoprocessor','surveyrig','mine','smelteriron','smeltercopper','smeltergold','foundrysteel','foundrywire','foundrygold'],
+      characters:['worker-base','worker-farmer','worker-processor','worker-factory','worker-baker','npc-merchant'],
+      landscape:['tree-oak','tree-pine','tree-willow','tree-palm','tree-dead','tree-stump','bush','grass-tuft','flower-red','flower-yellow','flower-blue','hedge','mushroom','crop-row','haystack','fallen-log','rock-large','rock-small','rock-flat','rock-cluster','cliff','mountain-high','mountain-low','hill','pond','river-straight','river-bend','water-pond'],
       structures:['fence-wood','fence-stone','gate','bridge-wood','well','windmill','water-tower','market-stall','signpost','lamp-post','bench'],
       props:['barrel','crate','pallet','sack','wheelbarrow','campfire','tent','flag','fountain'],
-      items:['cotton-bundle','cloth-roll','textile-box','wheat-bundle','flour-sack','bread-basket'],
-      vehicles:['cart','truck','wagon','boat'],
+      items:['cotton-bundle','cloth-roll','textile-box','wheat-bundle','flour-sack','bread-basket','coin','chest'],
+      vehicles:['cart','truck','wagon','boat','ship'],
+      effects:['dust-particles','fire-particle','smoke-particle','spark-particle'],
+      ui:['arrow','flag-ui','star-ui'],
     };
     for (const [folder,names] of Object.entries(folders)) for (const name of names) this.modelManifest[name]=`${base}models/${folder}/${name}.glb`;
 
-    // Map ship.glb to boat (alias for ship model)
+    // Handle special file naming cases (capitalize first letter for some files)
+    const specialMappings = {
+      'bakery': `${base}models/buildings/Bakery.glb`,
+      'mill': `${base}models/buildings/Mill.glb`,
+      'truck': `${base}models/vehicles/Truck.glb`,
+      'ship': `${base}models/vehicles/ship.glb`,
+      'water-pond': `${base}models/landscape/water-pond.glb`,
+      'coin': `${base}models/items/Coin.glb`,
+      'chest': `${base}models/items/chest.glb`,
+      'dust-particles': `${base}models/effects/dust_particles_glb.glb`,
+      'arrow': `${base}models/ui/Arrow.glb`,
+      'flag-ui': `${base}models/ui/Flag.glb`,
+      'star-ui': `${base}models/ui/Star.glb`,
+    };
+    Object.assign(this.modelManifest, specialMappings);
+
+    // Aliases
     if(!this.modelManifest['boat']) this.modelManifest['boat']=`${base}models/vehicles/ship.glb`;
 
     this.initScene();
@@ -126,8 +147,10 @@ export class GameRenderer {
   pf(key,h) {
     const g=new THREE.Group();
     if(key==='farm'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(6,3,5),0x8B4513),{position:new THREE.Vector3(0,1.5,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(4.5,2.5,4),0xc0392b),{position:new THREE.Vector3(0,4.2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(1,1,5,8),0x95a5a6),{position:new THREE.Vector3(4.5,2.5,0)}));return g;}
+    if(key==='farm-upgraded'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,3.5,6),0x654321),{position:new THREE.Vector3(0,1.75,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(5,3,4),0xb22222),{position:new THREE.Vector3(0,4.5,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(1.2,1.2,5,8),0x708090),{position:new THREE.Vector3(5,2.5,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(1,1,5,8),0x708090),{position:new THREE.Vector3(-5,2.5,0)}));return g;}
     if(key==='warehouse'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(8,4,6),0xe67e22),{position:new THREE.Vector3(0,2,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(9,0.3,7),0xd35400),{position:new THREE.Vector3(0,4.15,0)}));return g;}
     if(key==='factory'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(10,5,8),0x2c3e50),{position:new THREE.Vector3(0,2.5,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.6,0.8,6,8),0x7f8c8d),{position:new THREE.Vector3(3,8,2)}));return g;}
+    if(key==='workshop'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,3.5,5),0x8b7355),{position:new THREE.Vector3(0,1.75,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(4,2.5,4),0x5c4033),{position:new THREE.Vector3(0,4,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.6,0.6,4,6),0x696969),{position:new THREE.Vector3(3,4,2)}));return g;}
     if(key==='grain_farm'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,3,5),0xdaa520),{position:new THREE.Vector3(0,1.5,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(5,2,4),0xb8860b),{position:new THREE.Vector3(0,3.5,0)}));return g;}
     if(key==='mill'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(2,3,6,8),0xf5deb3),{position:new THREE.Vector3(0,3,0)}));g.add(Object.assign(this.mk(new THREE.ConeGeometry(3,2,8),0x8B4513),{position:new THREE.Vector3(0,7,0)}));return g;}
     if(key==='bakery'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(7,4,6),0xd2691e),{position:new THREE.Vector3(0,2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.5,0.5,3,6),0x696969),{position:new THREE.Vector3(3,5.5,-2)}));return g;}
@@ -175,7 +198,18 @@ export class GameRenderer {
     if(key==='pallet'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.8,h*0.15,h),0x8B4513),{position:new THREE.Vector3(-h*0.15,h*0.075,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.8,h*0.15,h),0x8B4513),{position:new THREE.Vector3(h*0.15,h*0.075,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(h,h*0.1,h*0.2),0xa0826d),{position:new THREE.Vector3(0,h*0.15,h*0.3)}));return g;}
     if(key==='sack'){const sackGeo=new THREE.ConeGeometry(h*0.25,h,6);g.add(Object.assign(this.mk(sackGeo,0xdaa520),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
     if(key==='wheelbarrow'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.6,h*0.4,h),0xd2691e),{position:new THREE.Vector3(0,h*0.2,0)}));g.add(Object.assign(this.mk(new THREE.CylinderGeometry(h*0.25,h*0.25,h*0.8,6),0x333333),{position:new THREE.Vector3(-h*0.35,h*0.25,-h*0.4),rotation:new THREE.Euler(0,0,Math.PI/2)}));return g;}
-    if(key.startsWith('worker')){const cols={'worker-farmer':0x228B22,'worker-baker':0xdaa520,'worker-factory':0x4682B4,'worker-processor':0xe67e22};g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.25,0.3,h*0.55,8),cols[key]||0x3498db),{position:new THREE.Vector3(0,h*0.3,0)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.14,8,6),0xFFDBAC),{position:new THREE.Vector3(0,h*0.72,0)}));return g;}
+    if(key.startsWith('worker')){const cols={'worker-farmer':0x228B22,'worker-baker':0xdaa520,'worker-factory':0x4682B4,'worker-processor':0xe67e22,'npc-merchant':0xff6b6b};g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.25,0.3,h*0.55,8),cols[key]||0x3498db),{position:new THREE.Vector3(0,h*0.3,0)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.14,8,6),0xFFDBAC),{position:new THREE.Vector3(0,h*0.72,0)}));return g;}
+    if(key==='npc-merchant'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(0.25,0.3,h*0.55,8),0xff6b6b),{position:new THREE.Vector3(0,h*0.3,0)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.14,8,6),0xFFDBAC),{position:new THREE.Vector3(0,h*0.72,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.3,h*0.25,h*0.15),0xffd700),{position:new THREE.Vector3(h*0.15,h*0.4,0)}));return g;}
+    if(key==='coin'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(h*0.5,h*0.5,h*0.1,32),0xffd700),{position:new THREE.Vector3(0,h*0.05,0)}));return g;}
+    if(key==='chest'){g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.8,h*0.6,h),0x8B4513),{position:new THREE.Vector3(0,h*0.3,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.9,h*0.15,h*1.05),0xcd853f),{position:new THREE.Vector3(0,h*0.6,0)}));return g;}
+    if(key==='dust-particles'){for(let i=0;i<8;i++){g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.1,4,3),0xc0a080),{position:new THREE.Vector3((Math.random()-0.5)*h,Math.random()*h*0.8,(Math.random()-0.5)*h)}));}return g;}
+    if(key==='fire-particle'){g.add(Object.assign(this.mk(new THREE.ConeGeometry(h*0.25,h*0.5,6),0xff6b1b),{position:new THREE.Vector3(0,h*0.25,0)}));g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.15,6,4),0xffa500),{position:new THREE.Vector3(0,h*0.5,0)}));return g;}
+    if(key==='smoke-particle'){for(let i=0;i<5;i++){g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*(0.3-i*0.05),4,3),0xbbbbbb),{position:new THREE.Vector3(0,h*0.3+i*h*0.15,0)}));}return g;}
+    if(key==='spark-particle'){for(let i=0;i<6;i++){const angle=i*Math.PI/3;g.add(Object.assign(this.mk(new THREE.SphereGeometry(h*0.08,4,3),0xffff00),{position:new THREE.Vector3(Math.cos(angle)*h*0.4,h*0.5,Math.sin(angle)*h*0.4)}));}return g;}
+    if(key==='arrow'){g.add(Object.assign(this.mk(new THREE.ConeGeometry(h*0.15,h,4),0xff4444),{position:new THREE.Vector3(0,h*0.5,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.1,h*0.3,h*0.15),0xcccccc),{position:new THREE.Vector3(0,h*0.05,0)}));return g;}
+    if(key==='flag-ui'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(h*0.08,h*0.08,h,6),0x888888),{position:new THREE.Vector3(0,h*0.5,0)}));g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.6,h*0.4,h*0.05),0xcc3333),{position:new THREE.Vector3(h*0.35,h*0.7,0)}));return g;}
+    if(key==='star-ui'){for(let i=0;i<5;i++){const angle=i*Math.PI*2/5;const r=h*0.3;g.add(Object.assign(this.mk(new THREE.ConeGeometry(h*0.08,h*0.3,4),0xffff00),{position:new THREE.Vector3(Math.cos(angle)*r,h*0.3+Math.sin(angle)*r*0.6,0),rotation:new THREE.Euler(Math.PI/2,0,angle)}));}return g;}
+    if(key==='water-pond'){g.add(Object.assign(this.mk(new THREE.CylinderGeometry(h,h,h*0.2,16),0x4488cc),{position:new THREE.Vector3(0,h*0.1,0)}));return g;}
     // generic
     g.add(Object.assign(this.mk(new THREE.BoxGeometry(h*0.6,h,h*0.6),0xaaaaaa),{position:new THREE.Vector3(0,h*0.5,0)}));
     return g;
