@@ -8,6 +8,14 @@ export class GameRenderer {
     this.gameStore = gameStore;
     this.options = options;
     this.scene = new THREE.Scene();
+
+    // Day/night cycle: 0-1 range, 0.5 = noon
+    this.timeOfDay = 0.35;
+    this.cycleSpeed = 0.00005; // slow cycle for atmosphere
+    this.sun = null;
+    this.skyMesh = null;
+    this.ambientLight = null;
+
     this.scene.fog = new THREE.FogExp2(0x9bc4e0, 0.0008);
     this.camera = new THREE.PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 5000);
     this.camera.position.set(0, 60, 100);
@@ -72,6 +80,9 @@ export class GameRenderer {
       vehicles:['cart','truck','wagon','boat'],
     };
     for (const [folder,names] of Object.entries(folders)) for (const name of names) this.modelManifest[name]=`${base}models/${folder}/${name}.glb`;
+
+    // Map ship.glb to boat (alias for ship model)
+    if(!this.modelManifest['boat']) this.modelManifest['boat']=`${base}models/vehicles/ship.glb`;
 
     this.initScene();
     this.setupLighting();
@@ -167,23 +178,171 @@ export class GameRenderer {
   }
 
   initScene() {
-    const skyGeo=new THREE.SphereGeometry(2500,32,32);
-    const skyMat=new THREE.ShaderMaterial({uniforms:{topColor:{value:new THREE.Color(0x3a7bd5)},bottomColor:{value:new THREE.Color(0xd4e8ff)},offset:{value:20},exponent:{value:0.5}},vertexShader:`varying vec3 vWP;void main(){vec4 wp=modelMatrix*vec4(position,1.0);vWP=wp.xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`uniform vec3 topColor,bottomColor;uniform float offset,exponent;varying vec3 vWP;void main(){float h=normalize(vWP+offset).y;gl_FragColor=vec4(mix(bottomColor,topColor,max(pow(max(h,0.0),exponent),0.0)),1.0);}`,side:THREE.BackSide});
-    this.scene.add(new THREE.Mesh(skyGeo,skyMat));
-    const gGeo=new THREE.PlaneGeometry(2000,2000,80,80);const pa=gGeo.attributes.position;
-    for(let i=0;i<pa.count;i++){const x=pa.getX(i),y=pa.getY(i);pa.setZ(i,Math.sin(x*0.008)*Math.cos(y*0.008)*2+Math.sin(x*0.02)*Math.cos(y*0.015)*0.8);}
+    // Dynamic sky that changes with time of day
+    const skyGeo = new THREE.SphereGeometry(2500, 32, 32);
+    const skyMat = new THREE.ShaderMaterial({
+      uniforms: {
+        topColor: { value: new THREE.Color(0x1a5fa0) },
+        bottomColor: { value: new THREE.Color(0xffc999) },
+        offset: { value: 20 },
+        exponent: { value: 0.5 }
+      },
+      vertexShader: `varying vec3 vWP;void main(){vec4 wp=modelMatrix*vec4(position,1.0);vWP=wp.xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+      fragmentShader: `uniform vec3 topColor,bottomColor;uniform float offset,exponent;varying vec3 vWP;void main(){float h=normalize(vWP+offset).y;gl_FragColor=vec4(mix(bottomColor,topColor,max(pow(max(h,0.0),exponent),0.0)),1.0);}`,
+      side: THREE.BackSide
+    });
+    this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    this.scene.add(this.skyMesh);
+
+    // Beautiful terrain with color variations
+    const gGeo = new THREE.PlaneGeometry(2000, 2000, 100, 100);
+    const pa = gGeo.attributes.position;
+    const colors = [];
+
+    for(let i = 0; i < pa.count; i++) {
+      const x = pa.getX(i), y = pa.getY(i);
+      const height = Math.sin(x * 0.008) * Math.cos(y * 0.008) * 2 + Math.sin(x * 0.02) * Math.cos(y * 0.015) * 0.8;
+      pa.setZ(i, height);
+
+      // Color based on height and position for natural variation
+      let color;
+      if(height > 1) {
+        // Higher areas: lighter green
+        color = new THREE.Color(0x7cb342);
+      } else if(height > 0) {
+        // Mid height: natural green
+        color = new THREE.Color(0x558b2f);
+      } else {
+        // Lower areas: darker, more earthy
+        color = new THREE.Color(0x4a7c2f);
+      }
+      // Add slight color variation based on position
+      const variation = Math.sin(x * 0.01) * 0.1 + Math.cos(y * 0.01) * 0.1;
+      color.multiplyScalar(0.9 + variation);
+      colors.push(color.r, color.g, color.b);
+    }
+
     gGeo.computeVertexNormals();
-    const ground=new THREE.Mesh(gGeo,new THREE.MeshLambertMaterial({color:0x5a8f3c}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;this.scene.add(ground);
-    const flat=new THREE.Mesh(new THREE.PlaneGeometry(2000,2000),new THREE.MeshBasicMaterial({visible:false}));flat.rotation.x=-Math.PI/2;this.scene.add(flat);this.placementGround=flat;
+    gGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+
+    const groundMaterial = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      side: THREE.FrontSide
+    });
+    const ground = new THREE.Mesh(gGeo, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    const flat = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshBasicMaterial({ visible: false }));
+    flat.rotation.x = -Math.PI / 2;
+    this.scene.add(flat);
+    this.placementGround = flat;
   }
 
   setupLighting() {
-    this.scene.add(new THREE.AmbientLight(0xffffff,0.45));
-    const sun=new THREE.DirectionalLight(0xfff5e6,1.0);sun.position.set(100,180,80);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
-    const d=250;sun.shadow.camera.near=1;sun.shadow.camera.far=600;sun.shadow.camera.left=-d;sun.shadow.camera.right=d;sun.shadow.camera.top=d;sun.shadow.camera.bottom=-d;
-    this.scene.add(sun);
-    const fill=new THREE.DirectionalLight(0x8ec8ff,0.2);fill.position.set(-60,80,-60);this.scene.add(fill);
-    this.scene.add(new THREE.HemisphereLight(0x87CEEB,0x5a8f3c,0.25));
+    // Ambient light - changes with time of day
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+    this.scene.add(this.ambientLight);
+
+    // Main sun - will move and change color
+    this.sun = new THREE.DirectionalLight(0xfff5e6, 1.0);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    const d = 250;
+    this.sun.shadow.camera.near = 1;
+    this.sun.shadow.camera.far = 600;
+    this.sun.shadow.camera.left = -d;
+    this.sun.shadow.camera.right = d;
+    this.sun.shadow.camera.top = d;
+    this.sun.shadow.camera.bottom = -d;
+    this.scene.add(this.sun);
+
+    // Fill light for softer shadows
+    this.fillLight = new THREE.DirectionalLight(0x8ec8ff, 0.2);
+    this.fillLight.position.set(-60, 80, -60);
+    this.scene.add(this.fillLight);
+
+    // Hemisphere light
+    this.hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x5a8f3c, 0.25);
+    this.scene.add(this.hemisphereLight);
+  }
+
+  updateDayNightCycle(dt) {
+    // Update time of day
+    this.timeOfDay = (this.timeOfDay + this.cycleSpeed * dt) % 1.0;
+
+    // Sun position follows a curve across the sky
+    const sunHeight = Math.sin(this.timeOfDay * Math.PI) * 180 + 20; // 20-200
+    const sunAngle = (this.timeOfDay - 0.5) * Math.PI; // -π/2 to π/2
+    const sunDistance = 200;
+    this.sun.position.set(Math.cos(sunAngle) * sunDistance, sunHeight, Math.sin(sunAngle) * sunDistance * 0.5);
+
+    // Sun color changes through day: orange at dawn/dusk, white at noon
+    let sunColor, sunIntensity;
+    if(this.timeOfDay < 0.25) {
+      // Night to dawn: dark blue to orange
+      const t = this.timeOfDay / 0.25;
+      sunColor = new THREE.Color(0x1a3a4d).lerp(new THREE.Color(0xff9950), t);
+      sunIntensity = 0.3 + t * 0.4;
+    } else if(this.timeOfDay < 0.5) {
+      // Dawn to noon: orange to white
+      const t = (this.timeOfDay - 0.25) / 0.25;
+      sunColor = new THREE.Color(0xff9950).lerp(new THREE.Color(0xfff5e6), t);
+      sunIntensity = 0.7 + t * 0.3;
+    } else if(this.timeOfDay < 0.75) {
+      // Noon to dusk: white to orange
+      const t = (this.timeOfDay - 0.5) / 0.25;
+      sunColor = new THREE.Color(0xfff5e6).lerp(new THREE.Color(0xff6b35), t);
+      sunIntensity = 1.0 - t * 0.3;
+    } else {
+      // Dusk to night: orange to dark
+      const t = (this.timeOfDay - 0.75) / 0.25;
+      sunColor = new THREE.Color(0xff6b35).lerp(new THREE.Color(0x1a3a4d), t);
+      sunIntensity = 0.7 - t * 0.4;
+    }
+
+    this.sun.color = sunColor;
+    this.sun.intensity = sunIntensity;
+
+    // Update ambient light
+    const ambientIntensity = 0.25 + Math.sin(this.timeOfDay * Math.PI) * 0.25;
+    this.ambientLight.intensity = ambientIntensity;
+
+    // Update sky colors
+    if(this.timeOfDay < 0.25) {
+      // Night to dawn
+      const t = this.timeOfDay / 0.25;
+      const topColor = new THREE.Color(0x0d1f2d).lerp(new THREE.Color(0x1a5fa0), t);
+      const bottomColor = new THREE.Color(0x1a2332).lerp(new THREE.Color(0xffc999), t);
+      this.skyMesh.material.uniforms.topColor.value = topColor;
+      this.skyMesh.material.uniforms.bottomColor.value = bottomColor;
+    } else if(this.timeOfDay < 0.5) {
+      // Dawn to noon
+      const t = (this.timeOfDay - 0.25) / 0.25;
+      const topColor = new THREE.Color(0x1a5fa0).lerp(new THREE.Color(0x87ceeb), t);
+      const bottomColor = new THREE.Color(0xffc999).lerp(new THREE.Color(0xe6f3ff), t);
+      this.skyMesh.material.uniforms.topColor.value = topColor;
+      this.skyMesh.material.uniforms.bottomColor.value = bottomColor;
+    } else if(this.timeOfDay < 0.75) {
+      // Noon to dusk
+      const t = (this.timeOfDay - 0.5) / 0.25;
+      const topColor = new THREE.Color(0x87ceeb).lerp(new THREE.Color(0xff6b35), t);
+      const bottomColor = new THREE.Color(0xe6f3ff).lerp(new THREE.Color(0xffa366), t);
+      this.skyMesh.material.uniforms.topColor.value = topColor;
+      this.skyMesh.material.uniforms.bottomColor.value = bottomColor;
+    } else {
+      // Dusk to night
+      const t = (this.timeOfDay - 0.75) / 0.25;
+      const topColor = new THREE.Color(0xff6b35).lerp(new THREE.Color(0x0d1f2d), t);
+      const bottomColor = new THREE.Color(0xffa366).lerp(new THREE.Color(0x1a2332), t);
+      this.skyMesh.material.uniforms.topColor.value = topColor;
+      this.skyMesh.material.uniforms.bottomColor.value = bottomColor;
+    }
+
+    // Update fog color to match sky
+    const fogColor = new THREE.Color(this.skyMesh.material.uniforms.bottomColor.value);
+    this.scene.fog.color = fogColor;
   }
 
   setupMouseTracking(){this.canvas.addEventListener('mousemove',(e)=>{const r=this.canvas.getBoundingClientRect();this.mouse.x=((e.clientX-r.left)/r.width)*2-1;this.mouse.y=-((e.clientY-r.top)/r.height)*2+1;if(this.placementMode&&this.previewBuilding)this.updatePreviewPosition();});}
@@ -214,7 +373,7 @@ export class GameRenderer {
     sc('grass-tuft',0,0,40,300,300,[0.5,1.5],25);sc('rock-large',0,0,10,250,250,[0.6,1.3],20);sc('rock-small',0,0,18,280,280,[0.5,1.4],15);
   }
 
-  update(dt){this.controls.update();this.applyPan(dt);}
+  update(dt){this.controls.update();this.applyPan(dt);this.updateDayNightCycle(dt);}
   render(){this.renderer.render(this.scene,this.camera);}
   resize(w,h){this.camera.aspect=w/h;this.camera.updateProjectionMatrix();this.renderer.setSize(w,h);}
   dispose(){this.controls?.dispose();const geos=new Set(),mats=new Set();this.scene?.traverse(o=>{if(o.geometry)geos.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>mats.add(m));});geos.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());this.renderer?.dispose();this.models.clear();this.scene=null;this.camera=null;this.renderer=null;}
